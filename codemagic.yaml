@@ -30,6 +30,12 @@ definitions:
       name: Dependencies
       script: cd app && flutter pub get
 
+    - &icons
+      name: Launcher icons
+      # Must run after `pub get` (it is a pub package) and after the platform
+      # folders exist (it writes into them). Both are true by the time this runs.
+      script: cd app && dart run flutter_launcher_icons
+
     - &analyze
       name: Analyse
       # Forty seconds here saves a six-minute build that was going to
@@ -92,6 +98,7 @@ workflows:
           echo "Release signing configured."
 
       - *pub_get
+      - *icons
       - *analyze
       - *test
 
@@ -178,6 +185,7 @@ workflows:
     scripts:
       - *generate_platform_folders
       - *pub_get
+      - *icons
       - *analyze
       - *test
 
