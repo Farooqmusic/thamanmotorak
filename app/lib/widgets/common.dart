@@ -50,12 +50,18 @@ class ChoiceRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.hint,
+    this.enabled = true,
   });
 
   final String label;
   final String? hint;
   final bool selected;
   final VoidCallback onTap;
+
+  /// A locked answer is shown, not hidden. An option that vanishes leaves the
+  /// customer wondering what he did; one that is visibly unavailable, with the
+  /// reason underneath, answers the question before he asks it.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -65,12 +71,14 @@ class ChoiceRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
+      child: Opacity(
+        opacity: enabled ? 1 : 0.42,
+        child: Material(
         color: selected ? (dark ? Brand.dTint : Brand.tint) : (dark ? Brand.dSurface2 : Brand.surface2),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -98,6 +106,7 @@ class ChoiceRow extends StatelessWidget {
                         label,
                         style: t.textTheme.bodyLarge?.copyWith(
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                          decoration: enabled ? null : TextDecoration.lineThrough,
                         ),
                       ),
                       if (hint != null && hint!.isNotEmpty) ...[
@@ -112,6 +121,7 @@ class ChoiceRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );
