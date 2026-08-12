@@ -134,24 +134,35 @@ class AppConfig {
   /// this: the factory badge (GXR, LTZ) and how loaded the car is (فل كامل).
   /// Both are offered, and «أخرى» always opens a free-text box so no car can
   /// be impossible to describe.
-  List<TrimGroup> trimGroups(String lang) {
+  /// [make] narrows the badge list to that manufacturer's own words. GXR is a
+  /// Toyota word and LTZ is a Chevrolet one; showing all of them at once turns
+  /// a list into a puzzle. A make we hold no list for falls back to a short
+  /// generic set, and «أخرى» always covers the rest.
+  List<TrimGroup> trimGroups(String lang, [String make = '']) {
     final t = _map(raw['trims']);
     final out = <TrimGroup>[];
 
-    void add(String key, String ar, String en) {
-      final v = t[key];
-      if (v is! List || v.isEmpty) return;
-      out.add(TrimGroup(
-        lang == 'ar' ? ar : en,
-        v.map((e) => _map(e)).map((m) {
-          final label = _str(m[lang], _str(m['en']));
-          return TrimOption(_str(m['key'], label), label);
-        }).toList(),
-      ));
+    List<TrimOption> options(Object? v) {
+      if (v is! List) return const [];
+      return v.map((e) => _map(e)).map((m) {
+        final label = _str(m[lang], _str(m['en']));
+        return TrimOption(_str(m['key'], label), label);
+      }).toList();
     }
 
-    add('badges', 'الفئة', 'Trim');
-    add('levels', 'مستوى التجهيز', 'Equipment level');
+    final byMake = _map(t['byMake']);
+    final badges = options(byMake[make] ?? t['default']);
+    if (badges.isNotEmpty) {
+      out.add(TrimGroup(lang == 'ar' ? 'الفئة' : 'Trim', badges));
+    }
+
+    final levels = options(t['levels']);
+    if (levels.isNotEmpty) {
+      out.add(TrimGroup(
+        lang == 'ar' ? 'مستوى التجهيز' : 'Equipment level',
+        levels,
+      ));
+    }
     return out;
   }
 
@@ -161,18 +172,15 @@ class AppConfig {
     return lang == 'ar' ? 'أخرى — اكتب الفئة' : 'Other — type it';
   }
 
-  /// True when the answer is not one of the offered options, so the free-text
-  /// box has to be shown for it.
-  bool isKnownTrim(String value) {
+  /// True when the answer is one of the options offered for this make, so the
+  /// free-text box does not need to be shown for it.
+  bool isKnownTrim(String value, [String make = '']) {
     if (value.isEmpty) return false;
-    for (final g in trimGroups('en')) {
-      for (final o in g.options) {
-        if (o.label == value) return true;
-      }
-    }
-    for (final g in trimGroups('ar')) {
-      for (final o in g.options) {
-        if (o.label == value) return true;
+    for (final lang in const ['en', 'ar']) {
+      for (final g in trimGroups(lang, make)) {
+        for (final o in g.options) {
+          if (o.label == value) return true;
+        }
       }
     }
     return false;
