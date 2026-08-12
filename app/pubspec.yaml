@@ -1,0 +1,42 @@
+name: thaman_app
+description: "ثـمـــن مــوتــرك — free used-car valuation in Qatar."
+publish_to: 'none'
+
+# version is set by CI from the run number, so two builds can never
+# collide in Play Console. The value here is only the local default.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Deliberately few plugins. Every extra native dependency is another
+  # thing that can break a release build or hold up a store review, and
+  # this app needs very little that Flutter does not already have.
+  http: ^1.2.0             # the only network client we need
+  image_picker: ^1.1.0     # camera + gallery, resizes before we ever hold the bytes
+  shared_preferences: ^2.2.0  # cached config and the saved draft
+  url_launcher: ^6.2.0     # terms, privacy, phone, Instagram
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/
+  fonts:
+    # The same face the website and the PDF use, so the three never disagree
+    # about how the name of the company is shaped.
+    - family: Naskh
+      fonts:
+        - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
+        - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
+          weight: 700
