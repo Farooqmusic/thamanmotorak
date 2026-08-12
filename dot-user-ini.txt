@@ -1,0 +1,6 @@
+; Upload limits (PHP-FPM / suPHP hosts read this file)
+upload_max_filesize = 64M
+post_max_size = 260M
+max_file_uploads = 20
+max_execution_time = 300
+memory_limit = 256M

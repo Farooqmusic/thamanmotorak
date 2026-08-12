@@ -1,0 +1,31 @@
+# ثـمـــن مــوتــرك / Evaluate Your Car — thamanmotorak.com
+# The public pages are open to every search engine.
+# Everything below Disallow is either private (customer photos, the
+# control panel) or has no meaning in a search result.
+
+User-agent: *
+Allow: /
+Allow: /?lang=en
+
+Disallow: /admin.php
+Disallow: /archive.php
+Disallow: /mailtest.php
+Disallow: /dnscheck.php
+Disallow: /cleanup.php
+Disallow: /gallery.php
+Disallow: /receipt.php
+Disallow: /file.php
+Disallow: /api.php
+Disallow: /uploads/
+Disallow: /data/
+Disallow: /tools/
+Disallow: /*?id=
+Disallow: /*&k=
+
+# The AI crawlers that follow the standard. Remove these four lines
+# if you would rather the site could be quoted by AI assistants.
+User-agent: GPTBot
+Disallow: /admin.php
+Disallow: /uploads/
+
+Sitemap: https://thamanmotorak.com/sitemap.xml

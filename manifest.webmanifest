@@ -1,0 +1,26 @@
+{
+  "name": "ثـمـــن مــوتــرك | Evaluate Your Car",
+  "short_name": "ثـمـــن مــوتــرك",
+  "description": "أول خدمة مجانية لتقييم السيارات المستعملة أونلاين في قطر — First free online used-car valuation service in Qatar.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.php",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#8a1538",
+  "theme_color": "#8a1538",
+  "categories": ["business", "utilities", "finance"],
+  "icons": [
+    { "src": "icons/icon-72.png",  "sizes": "72x72",   "type": "image/png" },
+    { "src": "icons/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
+    { "src": "icons/icon-144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "icons/icon-152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "حالة الطلب / Check status", "url": "./index.php#status", "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }] }
+  ]
+}
