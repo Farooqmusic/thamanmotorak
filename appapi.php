@@ -145,6 +145,84 @@ function app_condition(): array
 }
 
 /* ------------------------------------------------------------------ */
+/*  Trim — «الموديل / الفئة الفرعية»                                    */
+/*                                                                     */
+/*  This was a free-text box on the website and in v1 of the app, and a */
+/*  free-text box is where data goes to die: GXR, gxr, G X R, "full     */
+/*  option gxr" all mean one thing and sort as four. It is a list now,  */
+/*  with «أخرى» still opening the box so nothing a seller owns can be   */
+/*  impossible to describe.                                             */
+/*                                                                     */
+/*  Two axes, because Gulf sellers use both and they are not the same   */
+/*  question: the factory badge (GXR, VXR, LTZ) and how loaded the car  */
+/*  is (فل كامل / نص فل / ستاندرد).                                     */
+/*                                                                     */
+/*  Edit this list freely — the app reads it on launch, so a trim added */
+/*  here appears on every phone the next morning with no new release.   */
+/* ------------------------------------------------------------------ */
+function app_trims(): array
+{
+    $badge = function (string $s): array {
+        return ['key' => $s, 'ar' => $s, 'en' => $s];
+    };
+
+    return [
+        'levels' => [
+            ['key' => 'full', 'ar' => 'فل كامل',  'en' => 'Full option'],
+            ['key' => 'mid',  'ar' => 'نص فل',    'en' => 'Mid option'],
+            ['key' => 'std',  'ar' => 'ستاندرد',  'en' => 'Standard'],
+        ],
+        /* The badges seen most often in Qatar. Not exhaustive on purpose —
+           «أخرى» covers the rest, and a list nobody can scroll is worse than
+           a short one with an escape hatch. */
+        'badges' => array_map($badge, [
+            'GX', 'GXR', 'VX', 'VXR', 'TXL', 'EXR', 'SE', 'LE', 'XLE', 'GLX',
+            'GLS', 'GT', 'GTS', 'LT', 'LTZ', 'LS', 'SR5', 'S', 'SV', 'SL',
+            'Limited', 'Platinum', 'Premium', 'Prestige', 'Titanium',
+            'Sport', 'Elite', 'Signature', 'Base',
+        ]),
+        'other' => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
+    ];
+}
+
+/* ------------------------------------------------------------------ */
+/*  تصميم اليوم — the concept car of the day                            */
+/*                                                                     */
+/*  The website opens on a full-bleed concept picture that changes      */
+/*  three times a day, the same car for everybody. The app opens on the */
+/*  same one — picked here, by the server, so a phone and a laptop in   */
+/*  the same room never show different cars.                            */
+/* ------------------------------------------------------------------ */
+function app_concept(): ?array
+{
+    $file = APP_ROOT . '/concept.php';
+    if (!is_file($file)) return null;
+    require_once $file;
+    if (!function_exists('concept_today')) return null;
+
+    $c = concept_today();
+    if (!is_array($c)) return null;
+
+    $base = rtrim(base_url(), '/') . '/';
+    $abs = function (?string $rel) use ($base): ?string {
+        return $rel === null ? null : $base . ltrim($rel, '/');
+    };
+
+    return [
+        'name'   => (string)($c['name'] ?? ''),
+        'slot'   => (int)($c['slot'] ?? 0),
+        /* WebP first — it is roughly half the bytes, and every Android and
+           iOS version that can run this app can decode it. */
+        'image'  => $abs($c['webp'] ?? $c['jpg'] ?? null),
+        'image_sm' => $abs($c['webp_sm'] ?? $c['jpg_sm'] ?? null),
+        'jpg'    => $abs($c['jpg'] ?? null),
+        'width'  => (int)($c['w'] ?? 0),
+        'height' => (int)($c['h'] ?? 0),
+        'button' => ['ar' => ct('splashBtn', 'ar'), 'en' => ct('splashBtn', 'en')],
+    ];
+}
+
+/* ------------------------------------------------------------------ */
 /*  The whole payload                                                  */
 /* ------------------------------------------------------------------ */
 function app_config_payload(): array
@@ -188,6 +266,8 @@ function app_config_payload(): array
         'cond'     => app_condition(),
         'map'      => app_car_map(),
         'cars'     => app_car_db(),
+        'trims'    => app_trims(),
+        'concept'  => app_concept(),
 
         'supportKinds' => support_kinds(),
 
@@ -196,11 +276,25 @@ function app_config_payload(): array
         /* the built-in labels for the condition step, same shape */
         'condI18n' => cond_js_config()['i18n'],
 
-        'contact'  => [
-            'phone'     => (string)($contact['phone']     ?? ''),
-            'email'     => (string)($contact['email']     ?? ''),
-            'instagram' => (string)($contact['instagram'] ?? ''),
-            'website'   => (string)($contact['website']   ?? ''),
+        /* public_contact() returns a LIST of rows — [k, v, href] — not a map,
+           and reading it as a map is why the app's contact card came up empty.
+           Passed through as it comes: whatever Khalid has filled in appears, a
+           field he clears disappears, and adding a fifth link to the panel
+           needs no change here or in the app. */
+        'contact'  => array_map(static function (array $c): array {
+            return [
+                'kind'  => (string)($c['k'] ?? ''),
+                'label' => (string)($c['v'] ?? ''),
+                'href'  => (string)($c['href'] ?? ''),
+            ];
+        }, $contact),
+
+        /* «تطوير: فاروق» — the line is bilingual content, the address behind it
+           is not, so the two travel separately. */
+        'devCredit' => [
+            'ar'  => ct('devCredit', 'ar'),
+            'en'  => ct('devCredit', 'en'),
+            'url' => (string)cv('devCreditUrl'),
         ],
 
         /* The app opens these in a web view rather than duplicating the legal
