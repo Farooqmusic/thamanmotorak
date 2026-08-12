@@ -66,8 +66,22 @@ class AppConfig {
 
   String page(String key) => _str(_map(raw['pages'])[key]);
 
-  Map<String, String> get contact =>
-      _map(raw['contact']).map((k, v) => MapEntry(k, _str(v)));
+  /// WhatsApp, email, Instagram, website and whatever else Khalid has put in
+  /// the panel — in his order, and only the ones he has filled in.
+  List<ContactRow> get contact {
+    final v = raw['contact'];
+    if (v is! List) return const [];
+    return v
+        .map((e) => ContactRow(_map(e)))
+        .where((c) => c.label.isNotEmpty)
+        .toList();
+  }
+
+  /// «تطوير: فاروق» and the address behind it.
+  ({String label, String url}) devCredit(String lang) {
+    final m = _map(raw['devCredit']);
+    return (label: _str(m[lang], t('devCredit', lang)), url: _str(m['url']));
+  }
 
   // ----------------------------------------------------------------- cars
 
@@ -114,6 +128,65 @@ class AppConfig {
     return v.map((e) => PhotoSlot(_map(e))).toList();
   }
 
+  /// The trim list for «الموديل / الفئة الفرعية».
+  ///
+  /// Two groups, because sellers in Qatar use two different things to answer
+  /// this: the factory badge (GXR, LTZ) and how loaded the car is (فل كامل).
+  /// Both are offered, and «أخرى» always opens a free-text box so no car can
+  /// be impossible to describe.
+  List<TrimGroup> trimGroups(String lang) {
+    final t = _map(raw['trims']);
+    final out = <TrimGroup>[];
+
+    void add(String key, String ar, String en) {
+      final v = t[key];
+      if (v is! List || v.isEmpty) return;
+      out.add(TrimGroup(
+        lang == 'ar' ? ar : en,
+        v.map((e) => _map(e)).map((m) {
+          final label = _str(m[lang], _str(m['en']));
+          return TrimOption(_str(m['key'], label), label);
+        }).toList(),
+      ));
+    }
+
+    add('badges', 'الفئة', 'Trim');
+    add('levels', 'مستوى التجهيز', 'Equipment level');
+    return out;
+  }
+
+  String trimOtherLabel(String lang) {
+    final v = _map(_map(raw['trims'])['other'])[lang];
+    if (v is String && v.isNotEmpty) return v;
+    return lang == 'ar' ? 'أخرى — اكتب الفئة' : 'Other — type it';
+  }
+
+  /// True when the answer is not one of the offered options, so the free-text
+  /// box has to be shown for it.
+  bool isKnownTrim(String value) {
+    if (value.isEmpty) return false;
+    for (final g in trimGroups('en')) {
+      for (final o in g.options) {
+        if (o.label == value) return true;
+      }
+    }
+    for (final g in trimGroups('ar')) {
+      for (final o in g.options) {
+        if (o.label == value) return true;
+      }
+    }
+    return false;
+  }
+
+  /// تصميم اليوم — the concept car the website is showing right now, chosen by
+  /// the server so a phone and a laptop in the same room agree.
+  ConceptCar? get concept {
+    final m = _map(raw['concept']);
+    final url = _str(m['image']);
+    if (url.isEmpty) return null;
+    return ConceptCar(m);
+  }
+
   Condition get condition => Condition(_map(raw['cond']));
 
   CarMap get map => CarMap(_map(raw['map']));
@@ -149,6 +222,43 @@ class AppConfig {
 }
 
 // ===================================================================== bits
+
+class ContactRow {
+  ContactRow(this._m);
+  final Map<String, dynamic> _m;
+
+  /// 'WhatsApp' | 'Email' | 'Instagram' | 'Website' | a custom label
+  String get kind => _str(_m['kind']);
+  String get label => _str(_m['label']);
+  String get href => _str(_m['href']);
+}
+
+class TrimGroup {
+  const TrimGroup(this.title, this.options);
+  final String title;
+  final List<TrimOption> options;
+}
+
+class TrimOption {
+  const TrimOption(this.key, this.label);
+  final String key;
+  final String label;
+}
+
+class ConceptCar {
+  ConceptCar(this._m);
+  final Map<String, dynamic> _m;
+
+  String get name => _str(_m['name']);
+  String get image => _str(_m['image']);
+  String get imageSmall => _str(_m['image_sm'], _str(_m['image']));
+  double get aspect {
+    final w = _dbl(_m['width'], 0), h = _dbl(_m['height'], 0);
+    return (w > 0 && h > 0) ? w / h : 1.67;
+  }
+
+  String button(String lang) => _str(_map(_m['button'])[lang]);
+}
 
 class PhotoSlot {
   PhotoSlot(this._m);
