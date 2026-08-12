@@ -103,14 +103,16 @@ workflows:
           cd app
           flutter build apk --release \
             --build-name=1.0.$BUILD_NUMBER \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --dart-define=APP_VERSION=1.0.$BUILD_NUMBER
 
       - name: Build App Bundle
         script: |
           cd app
           flutter build appbundle --release \
             --build-name=1.0.$BUILD_NUMBER \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --dart-define=APP_VERSION=1.0.$BUILD_NUMBER
 
       - name: Give the files names a human can read
         script: |
@@ -190,6 +192,7 @@ workflows:
           flutter build ipa --release \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$BUILD_NUMBER \
+            --dart-define=APP_VERSION=1.0.$BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
