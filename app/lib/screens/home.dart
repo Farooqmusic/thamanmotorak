@@ -51,14 +51,21 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t('appName')),
-        actions: [_LanguageButton(prefs: widget.prefs)],
-      ),
+      appBar: AppBar(title: Text(t('appName'))),
       body: IndexedStack(index: tab, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
-        onDestinationSelected: (i) => setState(() => tab = i),
+        // The globe is the fifth destination but it is not a page: tapping it
+        // switches language and leaves you exactly where you were. Putting it
+        // in the bar rather than the corner means one thumb reaches everything,
+        // and in Arabic it lands on the far left, where the row ends.
+        onDestinationSelected: (i) {
+          if (i == 4) {
+            widget.prefs.setLang(lang == 'ar' ? 'en' : 'ar');
+            return;
+          }
+          setState(() => tab = i);
+        },
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.directions_car_outlined),
@@ -80,63 +87,14 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedIcon: const Icon(Icons.support_agent),
             label: t('navSupport'),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The language switch.
-///
-/// It was plain maroon text in the corner, which measured 3.3:1 against the
-/// dark background — below the 4.5:1 small text needs, and in practice almost
-/// invisible at night. It is now a bordered chip: legible in both themes, and
-/// it reads as something you can press rather than a label.
-///
-/// The word shown is always the language you would switch **to**. That is the
-/// only version people read correctly.
-class _LanguageButton extends StatelessWidget {
-  const _LanguageButton({required this.prefs});
-
-  final Prefs prefs;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final ink = dark ? Brand.dBrandInk : Brand.brand;
-    final toArabic = prefs.lang == 'en';
-
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 10),
-      child: Material(
-        color: dark ? Brand.dTint : Brand.tint,
-        borderRadius: BorderRadius.circular(11),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(11),
-          onTap: () => prefs.setLang(toArabic ? 'ar' : 'en'),
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 52, minHeight: 38),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: ink.withValues(alpha: 0.55)),
-            ),
-            child: Text(
-              toArabic ? 'ع' : 'EN',
-              // Each label is set in the face it is written in, whatever the
-              // app's current language — an "EN" in a naskh face looks wrong,
-              // and a lone "ع" in Poppins looks worse.
-              style: TextStyle(
-                fontFamily: toArabic ? 'Naskh' : 'Poppins',
-                fontWeight: FontWeight.w700,
-                fontSize: toArabic ? 19 : 15,
-                height: 1.1,
-                color: ink,
-              ),
-            ),
+          NavigationDestination(
+            icon: const Icon(Icons.language),
+            selectedIcon: const Icon(Icons.language),
+            // The label names the language you would switch TO — the only
+            // version people read correctly.
+            label: lang == 'ar' ? 'English' : 'العربية',
           ),
-        ),
+        ],
       ),
     );
   }

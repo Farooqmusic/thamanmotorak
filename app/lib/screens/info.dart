@@ -3,7 +3,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
 import '../state.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
+
+/// Written in by Codemagic at build time:
+///   flutter build apk --dart-define=APP_VERSION=1.0.$BUILD_NUMBER
+/// A local `flutter run` has no such flag, so it says "dev" — which is exactly
+/// what you want to see if a screenshot arrives from someone's laptop.
+const appVersion = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
 /// About, privacy, how it works, and how to reach a human.
 ///
@@ -57,45 +64,36 @@ class InfoScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // Only what the control panel actually holds. A blank field in the
-        // panel means the row disappears here too — the same rule the emails
-        // and the PDF follow, so a number cleared once is cleared everywhere.
-        SectionCard(
-          title: t('cTitle'),
-          child: Column(
-            children: [
-              if ((contact['phone'] ?? '').isNotEmpty)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_outlined),
-                  title: Text(contact['phone']!, textDirection: TextDirection.ltr),
-                  onTap: () => open('tel:${contact['phone']}'),
-                ),
-              if ((contact['email'] ?? '').isNotEmpty)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.mail_outline),
-                  title: Text(contact['email']!, textDirection: TextDirection.ltr),
-                  onTap: () => open('mailto:${contact['email']}'),
-                ),
-              if ((contact['instagram'] ?? '').isNotEmpty)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.camera_alt_outlined),
-                  title: Text(contact['instagram']!, textDirection: TextDirection.ltr),
-                  onTap: () => open(contact['instagram']!),
-                ),
-              if ((contact['website'] ?? '').isNotEmpty)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.language),
-                  title: Text(contact['website']!, textDirection: TextDirection.ltr),
-                  onTap: () => open(contact['website']!),
-                ),
-            ],
+        // Only what the control panel actually holds, in the order it holds
+        // it. A field Khalid clears disappears here too — the same rule the
+        // emails and the PDF follow, so a number cleared once is cleared
+        // everywhere.
+        if (contact.isNotEmpty) ...[
+          SectionCard(
+            title: t('cTitle'),
+            child: Column(
+              children: [
+                for (final c in contact)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_iconFor(c.kind)),
+                    title: Text(
+                      c.label,
+                      // Phone numbers, addresses and handles are Latin even in
+                      // an Arabic layout; letting them inherit RTL puts the
+                      // country code on the wrong end.
+                      textDirection: TextDirection.ltr,
+                      textAlign: prefs.isRtl ? TextAlign.right : TextAlign.left,
+                    ),
+                    subtitle: c.kind.isEmpty ? null : Text(c.kind),
+                    trailing: const Icon(Icons.open_in_new, size: 17),
+                    onTap: c.href.isEmpty ? null : () => open(c.href),
+                  ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
+        ],
 
         Row(
           children: [
@@ -114,8 +112,69 @@ class InfoScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Center(child: Text(t('devCredit'), style: theme.textTheme.bodySmall)),
+
+        // The version, so "it's not working" and "which build?" stop being two
+        // separate conversations. Stamped in at build time by Codemagic rather
+        // than read through a plugin — one less native dependency, and one less
+        // thing for a store reviewer to ask about.
+        Center(
+          child: SelectableText(
+            'v$appVersion',
+            style: theme.textTheme.bodySmall?.copyWith(letterSpacing: 0.8),
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        // «تطوير: فاروق» — a credit that leads somewhere. The address itself
+        // is never shown, only the line, exactly as the control panel says.
+        Center(
+          child: Builder(
+            builder: (context) {
+              final credit = config.devCredit(lang);
+              if (credit.label.trim().isEmpty) return const SizedBox.shrink();
+              if (credit.url.isEmpty) {
+                return Text(credit.label, style: theme.textTheme.bodySmall);
+              }
+              return TextButton(
+                onPressed: () => open(credit.url),
+                style: TextButton.styleFrom(
+                  textStyle: theme.textTheme.bodySmall,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size.zero,
+                ),
+                child: Text(
+                  credit.label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.brightness == Brightness.dark
+                        ? Brand.dBrandInk
+                        : Brand.brand,
+                    decoration: TextDecoration.underline,
+                    decorationColor: (theme.brightness == Brightness.dark
+                            ? Brand.dBrandInk
+                            : Brand.brand)
+                        .withValues(alpha: 0.5),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
+  }
+
+  static IconData _iconFor(String kind) {
+    switch (kind.toLowerCase()) {
+      case 'whatsapp':
+        return Icons.chat_bubble_outline;
+      case 'email':
+        return Icons.mail_outline;
+      case 'instagram':
+        return Icons.camera_alt_outlined;
+      case 'website':
+        return Icons.language;
+      default:
+        return Icons.link;
+    }
   }
 }

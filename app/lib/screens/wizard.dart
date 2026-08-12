@@ -346,13 +346,11 @@ class _StepCar extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // Free text, and required: «الموديل / الفئة الفرعية» is the trim —
-        // GXR, VXR, Limited — which no database can list for Qatar reliably.
-        _Field(
-          label: t('fModel'),
-          value: d.model,
-          onChanged: (v) => d.set(() => d.model = v),
-        ),
+        // «الموديل / الفئة الفرعية» — the trim. It was a free-text box, which
+        // is where data goes to die: GXR, gxr and "full option gxr" are one
+        // car and three answers. A list now, in two groups, with «أخرى» still
+        // opening the box so nothing a seller owns is impossible to describe.
+        _TrimField(cfg: cfg, d: d, lang: lang),
         const SizedBox(height: 14),
 
         _Dropdown(
@@ -393,6 +391,100 @@ class _StepCar extends StatelessWidget {
   }
 }
 
+/// The trim answer: a list, plus a way out of the list.
+///
+/// The escape hatch is not optional. Qatar imports from four continents and no
+/// list will ever hold every badge; an unlisted car must still be sellable, so
+/// «أخرى» opens the old free-text box and the answer goes to the server exactly
+/// as it always did.
+class _TrimField extends StatefulWidget {
+  const _TrimField({required this.cfg, required this.d, required this.lang});
+
+  final AppConfig cfg;
+  final Draft d;
+  final String lang;
+
+  @override
+  State<_TrimField> createState() => _TrimFieldState();
+}
+
+class _TrimFieldState extends State<_TrimField> {
+  static const _otherKey = '__other__';
+
+  late bool other = widget.d.model.isNotEmpty && !widget.cfg.isKnownTrim(widget.d.model);
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = widget.cfg;
+    final d = widget.d;
+    final lang = widget.lang;
+    final groups = cfg.trimGroups(lang);
+
+    final items = <DropdownMenuItem<String>>[];
+    for (final g in groups) {
+      // A heading, not an answer — two different questions live in one list
+      // and unlabelled they read as one confusing one.
+      items.add(DropdownMenuItem<String>(
+        enabled: false,
+        value: '__h_${g.title}',
+        child: Text(
+          g.title,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+        ),
+      ));
+      for (final o in g.options) {
+        items.add(DropdownMenuItem<String>(
+          value: o.label,
+          child: Text(o.label, overflow: TextOverflow.ellipsis),
+        ));
+      }
+    }
+    items.add(DropdownMenuItem<String>(
+      value: _otherKey,
+      child: Text(cfg.trimOtherLabel(lang)),
+    ));
+
+    final selected = other
+        ? _otherKey
+        : (cfg.isKnownTrim(d.model) ? d.model : null);
+
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          value: selected,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: cfg.t('fModel', lang)),
+          hint: Text(
+            lang == 'ar' ? '— اختر الفئة —' : '— select trim —',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          items: items,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() {
+              other = v == _otherKey;
+              d.set(() => d.model = other ? '' : v);
+            });
+          },
+        ),
+        if (other) ...[
+          const SizedBox(height: 10),
+          _Field(
+            key: const ValueKey('trim_other'),
+            label: '',
+            hint: lang == 'ar' ? 'مثال: GXR فل كامل' : 'e.g. GXR full option',
+            value: d.model,
+            onChanged: (v) => d.set(() => d.model = v),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 // ====================================================== step 2 — condition
 
 class _StepCondition extends StatelessWidget {
@@ -409,6 +501,7 @@ class _StepCondition extends StatelessWidget {
     final cond = cfg.condition;
     final map = cfg.map;
     final locked = d.paintStatus == 'original';
+    final hasAccident = d.panels.values.contains('accident');
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -494,12 +587,18 @@ class _StepCondition extends StatelessWidget {
         SectionCard(
           title: t('cpTitle'),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final k in cond.paintOrder)
                 ChoiceRow(
                   label: cond.paintLabel(k, lang),
                   hint: cond.paintHint(k, lang),
                   selected: d.paintStatus == k,
+                  // A panel marked as accident damage and "repainted only, no
+                  // accident" cannot both be true. The diagram is the more
+                  // specific statement, so it wins and this answer is locked —
+                  // the same rule the website enforces.
+                  enabled: !(k == 'repaint' && hasAccident),
                   onTap: () => d.set(() {
                     d.paintStatus = k;
                     if (k == 'original') {
@@ -508,6 +607,26 @@ class _StepCondition extends StatelessWidget {
                       d.paintExtent = '';
                     }
                   }),
+                ),
+              if (hasAccident)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.lock_outline, size: 17, color: Brand.amber),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t('cpLockRepaint'),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Brand.amber),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -699,13 +818,29 @@ class _StepPhotosState extends State<_StepPhotos> {
             Text(t('slotHint'), style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 16),
 
-            GridView.count(
-              crossAxisCount: 2,
+            // Eight tiles, on anything from a 4-inch phone to a tablet. The
+            // count follows the width rather than being fixed at two: on a
+            // narrow screen two tiles are already tight, and on a tablet two
+            // would be comically large.
+            //
+            // The aspect ratio has to follow the font scale as well — the tile
+            // carries two lines of text under the picture, and at 1.25× those
+            // lines are what overflow, not the picture.
+            LayoutBuilder(
+              builder: (context, box) {
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                final columns = box.maxWidth >= 560
+                    ? 4
+                    : box.maxWidth >= 400
+                        ? 3
+                        : 2;
+                return GridView.count(
+              crossAxisCount: columns,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.82,
+              childAspectRatio: (0.82 / scale).clamp(0.58, 0.9),
               children: [
                 for (final slot in cfg.slots)
                   _SlotTile(
@@ -720,6 +855,8 @@ class _StepPhotosState extends State<_StepPhotos> {
                     onClear: () => d.set(() => d.photoPaths.remove(slot.key)),
                   ),
               ],
+                );
+              },
             ),
             const SizedBox(height: 20),
 
