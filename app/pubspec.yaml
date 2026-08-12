@@ -33,10 +33,18 @@ flutter:
   assets:
     - assets/brand/
   fonts:
-    # The same face the website and the PDF use, so the three never disagree
-    # about how the name of the company is shaped.
+    # Two families, exactly as the website ships them. Arabic set in Naskh,
+    # English set in Poppins — Latin text in an Arabic naskh face reads thin
+    # and slightly foreign, which is what v1 did to every English screen.
+    # Each is the other's fallback, so a stray word in either script still
+    # renders in a face designed for it.
     - family: Naskh
       fonts:
         - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
         - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
+          weight: 700
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Bold.ttf
           weight: 700
