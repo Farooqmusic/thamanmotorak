@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api.dart';
 import 'config.dart';
 import 'screens/home.dart';
+import 'screens/splash.dart';
 import 'state.dart';
 import 'theme.dart';
 
@@ -33,6 +34,10 @@ class _ThamanAppState extends State<ThamanApp> {
   AppConfig? config;
   Object? error;
   bool loading = true;
+
+  /// The concept picture shows once per launch, not once per install: it is
+  /// a different car every day and people come back to see it.
+  bool conceptSeen = false;
 
   @override
   void initState() {
@@ -92,7 +97,7 @@ class _ThamanAppState extends State<ThamanApp> {
     final rtl = prefs.isRtl;
 
     return MaterialApp(
-      title: 'Thaman Motorak',
+      title: 'Thamanmotorak',
       debugShowCheckedModeBanner: false,
       // The theme depends on the language, not only the brightness: Arabic and
       // English are set in different faces and at different sizes.
@@ -105,17 +110,58 @@ class _ThamanAppState extends State<ThamanApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => Directionality(
-        textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+
+        // Two things happen to a layout on somebody else's phone: the screen is
+        // narrower than the one it was designed on, and the owner has turned
+        // their system font up. Together they are what actually breaks a
+        // screen — a 5-inch phone at 1.5× font scale has roughly half the room
+        // this app was drawn in.
+        //
+        // The scale is clamped rather than ignored: a customer who enlarged
+        // their type did it because they need it, so refusing entirely would be
+        // worse than a tight layout. 1.25 is as far as these screens stretch
+        // before the four-step header and the photo grid start to fight.
+        final scale = mq.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.25,
+        );
+
+        return MediaQuery(
+          data: mq.copyWith(textScaler: scale),
+          child: Directionality(
+            textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       home: _root(),
     );
   }
 
   Widget _root() {
     if (config != null) {
-      return HomeScreen(api: api, config: config!, prefs: prefs, draft: draft);
+      final home = HomeScreen(api: api, config: config!, prefs: prefs, draft: draft);
+
+      // The concept picture sits over a home screen that is already built, so
+      // lifting it reveals a finished app rather than starting to load one.
+      // Once per launch — a splash you cannot get past is an advertisement.
+      if (!conceptSeen && config!.concept != null) {
+        return Stack(
+          children: [
+            home,
+            ConceptSplash(
+              config: config!,
+              prefs: prefs,
+              onDismiss: () {
+                if (mounted && !conceptSeen) setState(() => conceptSeen = true);
+              },
+            ),
+          ],
+        );
+      }
+      return home;
     }
     if (loading) return const _Splash();
     return _FirstRunFailed(lang: prefs.lang, onRetry: _boot, error: error);
