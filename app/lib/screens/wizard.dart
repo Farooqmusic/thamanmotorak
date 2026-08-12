@@ -386,15 +386,8 @@ class _StepCar extends StatelessWidget {
           value: d.chassis,
           onChanged: (v) => d.set(() => d.chassis = v),
         ),
-        const SizedBox(height: 14),
-
-        _Field(
-          label: t('fNotes'),
-          hint: t('phNotes'),
-          value: d.notes,
-          lines: 3,
-          onChanged: (v) => d.set(() => d.notes = v),
-        ),
+        // The notes box is deliberately NOT here. It lives on step 2, right
+        // after the paint questions — see _StepCondition.
       ],
     );
   }
@@ -536,6 +529,22 @@ class _StepCondition extends StatelessWidget {
             ),
           ),
         ],
+
+        // The customer's own words sit here, right after the paint questions
+        // and before the three scales — the same place the website puts them,
+        // and for the same reason: this is the moment he is thinking about the
+        // condition of the car, not while he is typing a chassis number.
+        const SizedBox(height: 14),
+        SectionCard(
+          title: t('fNotes'),
+          child: _Field(
+            label: '',
+            hint: t('phNotes'),
+            value: d.notes,
+            lines: 4,
+            onChanged: (v) => d.set(() => d.notes = v),
+          ),
+        ),
 
         // interior · engine · gearbox — all three optional
         for (final scale in cond.scaleOrder) ...[
@@ -971,7 +980,9 @@ class _FieldState extends State<_Field> {
       inputFormatters: widget.formatters,
       textInputAction: widget.lines > 1 ? TextInputAction.newline : TextInputAction.next,
       decoration: InputDecoration(
-        labelText: widget.label,
+        // An empty label is not the same as no label: the first floats an
+        // empty box above the field. The card heading already names this one.
+        labelText: widget.label.isEmpty ? null : widget.label,
         hintText: widget.hint,
         suffixText: widget.suffix,
         alignLabelWithHint: widget.lines > 1,
