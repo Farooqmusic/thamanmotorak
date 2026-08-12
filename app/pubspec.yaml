@@ -27,6 +27,26 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Build-time only — it writes the launcher icons and is never shipped.
+  flutter_launcher_icons: ^0.14.0
+
+# The icon, generated for every Android density and every iOS size from one
+# picture, so there is no folder of hand-cut PNGs to keep in step.
+#
+# Android 8 and newer draw the icon in whatever shape the launcher wants —
+# circle, squircle, teardrop — and crop whatever falls outside. That is why the
+# adaptive icon is built from the *maskable* logo, which already carries the
+# safe margin, over the Qatar maroon. Using the plain logo here would clip the
+# roof of the car on a round launcher.
+flutter_launcher_icons:
+  image_path: "assets/brand/icon-512.png"
+  android: "ic_launcher"
+  adaptive_icon_background: "#8A1538"
+  adaptive_icon_foreground: "assets/brand/maskable-512.png"
+  ios: true
+  # The App Store rejects an icon with transparency, without explaining that
+  # this is what it means.
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
