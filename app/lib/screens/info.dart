@@ -77,13 +77,28 @@ class InfoScreen extends StatelessWidget {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(_iconFor(c.kind)),
-                    title: Text(
-                      c.label,
-                      // Phone numbers, addresses and handles are Latin even in
-                      // an Arabic layout; letting them inherit RTL puts the
-                      // country code on the wrong end.
-                      textDirection: TextDirection.ltr,
-                      textAlign: prefs.isRtl ? TextAlign.right : TextAlign.left,
+                    // One line, on any phone. An address is a link — nobody
+                    // reads it, they tap it — so shrinking it to fit beats
+                    // wrapping "contact@thamanmotorak.c / om" across two lines.
+                    title: Align(
+                      alignment: prefs.isRtl
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: prefs.isRtl
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Text(
+                          c.label,
+                          // Phone numbers, addresses and handles are Latin even
+                          // in an Arabic layout; letting them inherit RTL puts
+                          // the country code on the wrong end.
+                          textDirection: TextDirection.ltr,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
                     subtitle: c.kind.isEmpty ? null : Text(c.kind),
                     trailing: const Icon(Icons.open_in_new, size: 17),

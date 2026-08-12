@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../config.dart';
@@ -6,16 +8,19 @@ import '../theme.dart';
 
 /// تصميم اليوم — the concept car the site opens on, now opening the app too.
 ///
-/// Laid out like the website, and for the website's reason: **the whole car has
-/// to be visible.** The first version filled the screen with `BoxFit.cover`,
-/// which on a tall phone crops a wide studio photograph down to a wheel arch
-/// and a door. These pictures are the product — a car cut in half is worse than
-/// no picture at all.
+/// Two demands that look like opposites: the picture must **fill the screen**,
+/// and the car must be **whole**. A wide studio photograph on a tall phone can
+/// do one or the other — `cover` fills it and crops the car to a wheel arch;
+/// `contain` keeps the car and leaves black bars.
 ///
-/// So the shape is the site's: name and badge at the top, the car whole and
-/// centred in the middle, and the gold button at the bottom where a thumb
-/// already is. Nothing overlaps the photograph, which also means no gradient
-/// scrim fighting whatever colour the car happens to be.
+/// So it does both, in two layers. The same photograph is painted twice: once
+/// blurred and scaled to `cover`, filling every pixel including behind the
+/// status bar, and once sharp and `contain`ed on top, whole. The blur is the
+/// car's own colours, so the screen reads as one image rather than a picture
+/// in a frame — and there is never a black bar.
+///
+/// The gold button sits at the very bottom, below the words, where a thumb
+/// already rests.
 class ConceptSplash extends StatefulWidget {
   const ConceptSplash({
     super.key,
@@ -83,7 +88,24 @@ class _ConceptSplashState extends State<ConceptSplash>
       ),
       child: Material(
         color: Brand.dBg,
-        child: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Layer 1 — the same picture, blurred and cropped to fill every
+            // pixel. It is never looked at directly; it exists so the screen
+            // has no empty edges and no black bars.
+            Image.network(
+              concept.image,
+              fit: BoxFit.cover,
+              errorBuilder: (context, _, __) => const SizedBox.shrink(),
+            ),
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 38, sigmaY: 38),
+              child: Container(color: Brand.dBg.withValues(alpha: 0.72)),
+            ),
+
+            // Layer 2 — everything you actually read, over the top.
+            SafeArea(
           child: LayoutBuilder(
             builder: (context, box) {
               final short = box.maxHeight < 640;
@@ -214,7 +236,21 @@ class _ConceptSplashState extends State<ConceptSplash>
                         ),
                       ),
                     ],
-                    SizedBox(height: short ? 12 : 18),
+                    SizedBox(height: short ? 6 : 10),
+
+                    // The credit goes above the button, not below it, so the
+                    // button is the last thing on the screen and sits where a
+                    // thumb already rests.
+                    Text(
+                      lang == 'ar' ? 'تصميم اليوم' : 'Concept of the day',
+                      style: TextStyle(
+                        fontFamily: font,
+                        fontSize: 11.5,
+                        color: const Color(0x99FFFFFF),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(height: short ? 10 : 14),
 
                     // ------------------------------------------- the button
                     SizedBox(
@@ -224,7 +260,7 @@ class _ConceptSplashState extends State<ConceptSplash>
                         style: FilledButton.styleFrom(
                           backgroundColor: Brand.gold,
                           foregroundColor: Brand.goldInk,
-                          minimumSize: Size.fromHeight(short ? 50 : 56),
+                          minimumSize: Size.fromHeight(short ? 52 : 58),
                         ),
                         child: Text(
                           label,
@@ -238,21 +274,13 @@ class _ConceptSplashState extends State<ConceptSplash>
                         ),
                       ),
                     ),
-                    SizedBox(height: short ? 4 : 8),
-                    Text(
-                      lang == 'ar' ? 'تصميم اليوم' : 'Concept of the day',
-                      style: TextStyle(
-                        fontFamily: font,
-                        fontSize: 11.5,
-                        color: const Color(0x99FFFFFF),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
                   ],
                 ),
               );
             },
           ),
+            ),
+          ],
         ),
       ),
     );

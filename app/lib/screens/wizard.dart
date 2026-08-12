@@ -344,6 +344,8 @@ class _StepCar extends StatelessWidget {
           onChanged: (v) => d.set(() {
             d.carClass = v ?? '';
             d.year = '';
+            // A Camry trim means nothing on a Land Cruiser.
+            d.model = '';
           }),
         ),
         const SizedBox(height: 14),
@@ -414,7 +416,7 @@ class _TrimFieldState extends State<_TrimField> {
   static const _otherKey = '__other__';
 
   late bool other =
-      widget.d.model.isNotEmpty && !widget.cfg.isKnownTrim(widget.d.model, widget.d.make);
+      widget.d.model.isNotEmpty && !widget.cfg.isKnownTrim(widget.d.model, widget.d.make, widget.d.carClass);
 
   /// A trim chosen for Toyota is meaningless once the make becomes Chevrolet,
   /// so changing the make clears it rather than leaving GXR sitting under a
@@ -424,7 +426,7 @@ class _TrimFieldState extends State<_TrimField> {
     super.didUpdateWidget(old);
     if (widget.d.model.isNotEmpty &&
         !other &&
-        !widget.cfg.isKnownTrim(widget.d.model, widget.d.make)) {
+        !widget.cfg.isKnownTrim(widget.d.model, widget.d.make, widget.d.carClass)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.d.set(() => widget.d.model = '');
       });
@@ -436,7 +438,7 @@ class _TrimFieldState extends State<_TrimField> {
     final cfg = widget.cfg;
     final d = widget.d;
     final lang = widget.lang;
-    final groups = cfg.trimGroups(lang, d.make);
+    final groups = cfg.trimGroups(lang, d.make, d.carClass);
 
     final items = <DropdownMenuItem<String>>[];
     for (final g in groups) {
@@ -467,7 +469,7 @@ class _TrimFieldState extends State<_TrimField> {
 
     final selected = other
         ? _otherKey
-        : (cfg.isKnownTrim(d.model, d.make) ? d.model : null);
+        : (cfg.isKnownTrim(d.model, d.make, d.carClass) ? d.model : null);
 
     return Column(
       children: [
