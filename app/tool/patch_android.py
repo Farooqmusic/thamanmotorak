@@ -17,9 +17,12 @@ from pathlib import Path
 APP = Path(__file__).resolve().parent.parent
 ANDROID = APP / "android"
 
-# The name the store shows, and the name under the icon.
-LABEL_EN = "Evaluate Your Car"
-LABEL_AR = "ثمن موترك"
+# The name under the icon, and the name the store shows.
+# One word in both languages on purpose: it is the brand, it is the domain,
+# and a launcher that says one thing in Arabic and another in English makes
+# the same app look like two.
+LABEL_EN = "Thamanmotorak"
+LABEL_AR = "Thamanmotorak"
 
 
 def die(msg: str) -> None:
