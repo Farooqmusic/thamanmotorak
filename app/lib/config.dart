@@ -138,9 +138,19 @@ class AppConfig {
   /// Toyota word and LTZ is a Chevrolet one; showing all of them at once turns
   /// a list into a puzzle. A make we hold no list for falls back to a short
   /// generic set, and «أخرى» always covers the rest.
-  List<TrimGroup> trimGroups(String lang, [String make = '']) {
+  /// The manufacturer's own trims for this exact car.
+  ///
+  /// [carClass] is the model — Land Cruiser, Camry, Patrol — and it is asked
+  /// first, because a Land Cruiser is GXR and VXR while a Camry is GLE and
+  /// Limited, and the two lists have nothing to do with each other even though
+  /// both cars are Toyotas. Only if the model is unlisted does the make's
+  /// common set stand in.
+  ///
+  /// There is no invented "equipment level" group any more. BMW does not sell
+  /// a «فل كامل», and offering one puts a phrase in the record that the
+  /// manufacturer never used.
+  List<TrimGroup> trimGroups(String lang, [String make = '', String carClass = '']) {
     final t = _map(raw['trims']);
-    final out = <TrimGroup>[];
 
     List<TrimOption> options(Object? v) {
       if (v is! List) return const [];
@@ -150,20 +160,18 @@ class AppConfig {
       }).toList();
     }
 
-    final byMake = _map(t['byMake']);
-    final badges = options(byMake[make] ?? t['default']);
-    if (badges.isNotEmpty) {
-      out.add(TrimGroup(lang == 'ar' ? 'الفئة' : 'Trim', badges));
+    final byModel = options(_map(t['byModel'])[carClass]);
+    if (byModel.isNotEmpty) {
+      return [TrimGroup(lang == 'ar' ? 'الفئة' : 'Trim', byModel)];
     }
 
-    final levels = options(t['levels']);
-    if (levels.isNotEmpty) {
-      out.add(TrimGroup(
-        lang == 'ar' ? 'مستوى التجهيز' : 'Equipment level',
-        levels,
-      ));
+    final byMake = options(_map(t['byMake'])[make]);
+    if (byMake.isNotEmpty) {
+      return [TrimGroup(lang == 'ar' ? 'الفئة' : 'Trim', byMake)];
     }
-    return out;
+
+    // Nothing honest to offer — «أخرى» is the whole answer.
+    return const [];
   }
 
   String trimOtherLabel(String lang) {
@@ -174,10 +182,10 @@ class AppConfig {
 
   /// True when the answer is one of the options offered for this make, so the
   /// free-text box does not need to be shown for it.
-  bool isKnownTrim(String value, [String make = '']) {
+  bool isKnownTrim(String value, [String make = '', String carClass = '']) {
     if (value.isEmpty) return false;
     for (final lang in const ['en', 'ar']) {
-      for (final g in trimGroups(lang, make)) {
+      for (final g in trimGroups(lang, make, carClass)) {
         for (final o in g.options) {
           if (o.label == value) return true;
         }
