@@ -1075,6 +1075,7 @@ class _StepContact extends StatelessWidget {
 
 class _Field extends StatefulWidget {
   const _Field({
+    super.key,
     required this.label,
     required this.value,
     required this.onChanged,

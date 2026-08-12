@@ -36,7 +36,12 @@ class SentScreen extends StatelessWidget {
         title: Text(t('sentTitle')),
         automaticallyImplyLeading: false,
       ),
-      body: ListView(
+      // Without this the last button sat underneath Android's own navigation
+      // bar — reachable only by scrolling past the end, and on a phone with
+      // gesture navigation, fighting the back swipe to get there.
+      body: SafeArea(
+        top: false,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
         children: [
           const Center(child: Icon(Icons.check_circle, size: 68, color: Brand.green)),
@@ -113,6 +118,7 @@ class SentScreen extends StatelessWidget {
             child: Text(t('another')),
           ),
         ],
+        ),
       ),
     );
   }
