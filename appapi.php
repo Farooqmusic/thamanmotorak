@@ -166,12 +166,108 @@ function app_trims(): array
         return ['key' => $s, 'ar' => $s, 'en' => $s];
     };
 
-    /* Trims belong to a manufacturer, not to cars in general.
-       GXR is a Toyota word. LTZ is a Chevrolet word. Rubicon is a Jeep word.
-       Offering all ninety at once asks a Land Cruiser owner to find "GXR"
-       somewhere between "Denali" and "Scat Pack" — which is not a list, it is
-       a puzzle. The app now shows only the badges of the make chosen in the
-       question above. */
+    /* Trims are the manufacturer's words, not ours.
+       ------------------------------------------------------------------
+       There is no such thing as a BMW "فل كامل". That was an equipment
+       level invented here, and inventing a trim is worse than having none:
+       it puts a phrase in the record that the manufacturer never used, and
+       Khalid then prices a car against a description that means nothing.
+       The invented levels are gone.
+
+       Trims are now looked up by MODEL first — a Land Cruiser is GXR and
+       VXR, a Camry is GLE and Limited, and they are not interchangeable
+       even though both are Toyotas. Where a model is not listed, the make's
+       own common badges are offered instead, and «أخرى» is always there.
+
+       This list is not complete and cannot pretend to be: Qatar sells
+       hundreds of models and their trims change by year and by importer.
+       It covers what actually arrives through the form. Add to it freely —
+       every phone picks the change up on next launch. */
+    $byModel = [
+        // --- Toyota ---------------------------------------------------
+        'Land Cruiser'      => ['GX', 'GXR', 'GXR-V', 'VX', 'VXR', 'VX-R', 'GR Sport'],
+        'Land Cruiser 70'   => ['LX', 'GX', 'GXR'],
+        'Prado'             => ['TX', 'TXL', 'VX', 'VXR', 'GX'],
+        'Fortuner'          => ['GX', 'GXR', 'VXR', 'Legender'],
+        'Camry'             => ['GL', 'GLE', 'SE', 'Limited', 'Grande'],
+        'Corolla'           => ['XLI', 'GLI', 'SE', 'LE', 'Elite'],
+        'Hilux'             => ['GL', 'GLX', 'SR5', 'Adventure', 'GR Sport'],
+        'RAV4'              => ['LE', 'XLE', 'Limited', 'Adventure'],
+        'Yaris'             => ['E', 'Y', 'Y Plus', 'SE'],
+        'Highlander'        => ['LE', 'XLE', 'Limited', 'Platinum'],
+        'Tundra'            => ['SR5', 'Limited', 'Platinum', '1794', 'TRD Pro'],
+        'Rush'              => ['E', 'G', 'S'],
+
+        // --- Lexus ----------------------------------------------------
+        'LX'                => ['Standard', 'Premier', 'Sport', 'F Sport', 'VIP'],
+        'GX'                => ['Premier', 'Sport', 'Overtrail'],
+        'RX'                => ['Standard', 'Premier', 'F Sport', 'Luxury'],
+        'ES'                => ['Standard', 'Premier', 'Platinum', 'F Sport'],
+        'NX'                => ['Standard', 'Premier', 'F Sport'],
+
+        // --- Nissan ---------------------------------------------------
+        'Patrol'            => ['XE', 'SE', 'SE Platinum', 'LE', 'LE Platinum', 'Nismo'],
+        'Patrol Safari'     => ['GL', 'Super Safari'],
+        'X-Trail'           => ['S', 'SV', 'SL'],
+        'Altima'            => ['S', 'SV', 'SL', 'SR'],
+        'Sunny'             => ['S', 'SV', 'SL'],
+        'Pathfinder'        => ['S', 'SV', 'SL', 'Platinum'],
+
+        // --- Mitsubishi -----------------------------------------------
+        'Pajero'            => ['GLS', 'GLX', 'Standard'],
+        'Montero Sport'     => ['GLS', 'GLX'],
+        'L200'              => ['GL', 'GLS', 'GLX'],
+
+        // --- Honda ----------------------------------------------------
+        'Accord'            => ['LX', 'EX', 'EX-L', 'Sport', 'Touring'],
+        'Civic'             => ['LX', 'EX', 'Sport', 'Touring'],
+        'CR-V'              => ['LX', 'EX', 'EX-L', 'Touring'],
+        'Pilot'             => ['LX', 'EX', 'EX-L', 'Touring', 'Elite'],
+
+        // --- Hyundai / Kia --------------------------------------------
+        'Sonata'            => ['GL', 'Smart', 'Comfort', 'Premium', 'N Line'],
+        'Elantra'           => ['GL', 'Smart', 'Comfort', 'Premium'],
+        'Tucson'            => ['GL', 'Smart', 'Comfort', 'Premium'],
+        'Santa Fe'          => ['GL', 'Comfort', 'Premium', 'Calligraphy'],
+        'Palisade'          => ['GL', 'Comfort', 'Premium', 'Calligraphy'],
+        'Sportage'          => ['LX', 'EX', 'GT-Line'],
+        'Sorento'           => ['LX', 'EX', 'SX', 'GT-Line'],
+        'Telluride'         => ['LX', 'EX', 'SX'],
+        'Cerato'            => ['LX', 'EX', 'GT-Line'],
+
+        // --- GM -------------------------------------------------------
+        'Tahoe'             => ['LS', 'LT', 'RST', 'Z71', 'Premier', 'High Country'],
+        'Suburban'          => ['LS', 'LT', 'RST', 'Z71', 'Premier', 'High Country'],
+        'Silverado'         => ['WT', 'Custom', 'LT', 'RST', 'LTZ', 'High Country'],
+        'Malibu'            => ['LS', 'LT', 'RS', 'Premier'],
+        'Yukon'             => ['SLE', 'SLT', 'AT4', 'Denali'],
+        'Yukon XL'          => ['SLE', 'SLT', 'AT4', 'Denali'],
+        'Sierra'            => ['SLE', 'SLT', 'AT4', 'Denali'],
+        'Escalade'          => ['Luxury', 'Premium Luxury', 'Sport', 'Platinum', 'V'],
+
+        // --- Ford / Jeep / RAM ----------------------------------------
+        'Expedition'        => ['XL', 'XLT', 'Limited', 'King Ranch', 'Platinum'],
+        'Explorer'          => ['XLT', 'Limited', 'ST', 'Platinum'],
+        'F-150'             => ['XL', 'XLT', 'Lariat', 'King Ranch', 'Platinum', 'Raptor'],
+        'Mustang'           => ['EcoBoost', 'GT', 'Mach 1', 'Shelby'],
+        'Wrangler'          => ['Sport', 'Sahara', 'Rubicon', 'Willys'],
+        'Grand Cherokee'    => ['Laredo', 'Limited', 'Overland', 'Summit', 'SRT', 'Trackhawk'],
+        '1500'              => ['Tradesman', 'Big Horn', 'Laramie', 'Rebel', 'Limited'],
+
+        // --- German ---------------------------------------------------
+        'G-Class'           => ['G 400 d', 'G 500', 'AMG G 63'],
+        'S-Class'           => ['S 450', 'S 500', 'S 580', 'AMG S 63', 'Maybach'],
+        'E-Class'           => ['E 200', 'E 300', 'E 450', 'AMG E 53'],
+        'C-Class'           => ['C 180', 'C 200', 'C 300', 'AMG C 43'],
+        'GLE'               => ['GLE 450', 'GLE 580', 'AMG GLE 53', 'AMG GLE 63'],
+        'GLS'               => ['GLS 450', 'GLS 580', 'AMG GLS 63', 'Maybach'],
+        'X5'                => ['xDrive40i', 'xDrive50e', 'M60i', 'X5 M'],
+        'X7'                => ['xDrive40i', 'M60i', 'Alpina XB7'],
+        '3 Series'          => ['320i', '330i', 'M340i', 'M3'],
+        '5 Series'          => ['520i', '530i', '540i', 'M5'],
+        '7 Series'          => ['735i', '740i', '760i', 'i7'],
+    ];
+
     $byMake = [
         'Toyota'        => ['GX', 'GXR', 'VX', 'VXR', 'TXL', 'EXR', 'GR Sport', 'SE', 'SR5', 'XLI', 'GLI', 'Limited', 'TRD'],
         'Lexus'         => ['Standard', 'Prestige', 'Platinum', 'F Sport', 'Ultra Luxury'],
@@ -196,20 +292,18 @@ function app_trims(): array
         'BMW'           => ['Base', 'Sport Line', 'Luxury Line', 'M Sport', 'M', 'xDrive'],
     ];
 
-    $out = [];
-    foreach ($byMake as $make => $list) $out[$make] = array_map($badge, $list);
+    $makeOut = [];
+    foreach ($byMake as $make => $list) $makeOut[$make] = array_map($badge, $list);
+
+    $modelOut = [];
+    foreach ($byModel as $model => $list) $modelOut[$model] = array_map($badge, $list);
 
     return [
-        'levels' => [
-            ['key' => 'full', 'ar' => 'فل كامل',  'en' => 'Full option'],
-            ['key' => 'mid',  'ar' => 'نص فل',    'en' => 'Mid option'],
-            ['key' => 'std',  'ar' => 'ستاندرد',  'en' => 'Standard'],
-        ],
-        'byMake' => $out,
-        /* For a make not listed above — the Chinese brands, mostly, where the
-           badge is usually just a number. Short on purpose. */
-        'default' => array_map($badge, ['Base', 'Mid', 'Full', 'Comfort', 'Luxury', 'Sport', 'Premium']),
-        'other'  => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
+        /* Model first, make second. No third level: an equipment grade we
+           made up is not a trim, and there is no honest default. */
+        'byModel' => $modelOut,
+        'byMake'  => $makeOut,
+        'other'   => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
     ];
 }
 
