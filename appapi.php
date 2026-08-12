@@ -166,22 +166,50 @@ function app_trims(): array
         return ['key' => $s, 'ar' => $s, 'en' => $s];
     };
 
+    /* Trims belong to a manufacturer, not to cars in general.
+       GXR is a Toyota word. LTZ is a Chevrolet word. Rubicon is a Jeep word.
+       Offering all ninety at once asks a Land Cruiser owner to find "GXR"
+       somewhere between "Denali" and "Scat Pack" — which is not a list, it is
+       a puzzle. The app now shows only the badges of the make chosen in the
+       question above. */
+    $byMake = [
+        'Toyota'        => ['GX', 'GXR', 'VX', 'VXR', 'TXL', 'EXR', 'GR Sport', 'SE', 'SR5', 'XLI', 'GLI', 'Limited', 'TRD'],
+        'Lexus'         => ['Standard', 'Prestige', 'Platinum', 'F Sport', 'Ultra Luxury'],
+        'Nissan'        => ['XE', 'SE', 'SV', 'SL', 'LE', 'Platinum', 'Nismo', 'Titanium'],
+        'Infiniti'      => ['Luxe', 'Essential', 'Sensory', 'Autograph', 'Sport'],
+        'Mitsubishi'    => ['GLX', 'GLS', 'Highline', 'Standard', 'Ralliart'],
+        'Honda'         => ['DX', 'LX', 'EX', 'EX-L', 'Sport', 'Touring', 'Type R'],
+        'Mazda'         => ['S', 'SV', 'Touring', 'Grand Touring', 'Signature'],
+        'Hyundai'       => ['GL', 'GLS', 'Smart', 'Comfort', 'Premium', 'Limited', 'Calligraphy', 'N Line'],
+        'Kia'           => ['LX', 'EX', 'SX', 'GT-Line', 'Base', 'Mid', 'Full'],
+        'Genesis'       => ['Premium', 'Luxury', 'Prestige', 'Sport'],
+        'Chevrolet'     => ['LS', 'LT', 'LTZ', 'RS', 'Premier', 'High Country', 'Z71', 'SS'],
+        'GMC'           => ['SLE', 'SLT', 'AT4', 'Denali', 'Elevation'],
+        'Cadillac'      => ['Luxury', 'Premium Luxury', 'Sport', 'Platinum', 'V'],
+        'Ford'          => ['XL', 'XLT', 'Lariat', 'King Ranch', 'Platinum', 'Titanium', 'ST', 'Raptor'],
+        'Lincoln'       => ['Standard', 'Reserve', 'Black Label'],
+        'Dodge'         => ['SXT', 'GT', 'R/T', 'SRT', 'Scat Pack', 'Hellcat'],
+        'RAM'           => ['Tradesman', 'Big Horn', 'Laramie', 'Limited', 'Rebel', 'TRX'],
+        'Chrysler'      => ['Touring', 'Limited', 'S'],
+        'Jeep'          => ['Sport', 'Sahara', 'Rubicon', 'Laredo', 'Limited', 'Overland', 'Summit', 'Trailhawk'],
+        'Mercedes-Benz' => ['Base', 'AMG Line', 'AMG', 'Maybach', '4MATIC', 'Night Package'],
+        'BMW'           => ['Base', 'Sport Line', 'Luxury Line', 'M Sport', 'M', 'xDrive'],
+    ];
+
+    $out = [];
+    foreach ($byMake as $make => $list) $out[$make] = array_map($badge, $list);
+
     return [
         'levels' => [
             ['key' => 'full', 'ar' => 'فل كامل',  'en' => 'Full option'],
             ['key' => 'mid',  'ar' => 'نص فل',    'en' => 'Mid option'],
             ['key' => 'std',  'ar' => 'ستاندرد',  'en' => 'Standard'],
         ],
-        /* The badges seen most often in Qatar. Not exhaustive on purpose —
-           «أخرى» covers the rest, and a list nobody can scroll is worse than
-           a short one with an escape hatch. */
-        'badges' => array_map($badge, [
-            'GX', 'GXR', 'VX', 'VXR', 'TXL', 'EXR', 'SE', 'LE', 'XLE', 'GLX',
-            'GLS', 'GT', 'GTS', 'LT', 'LTZ', 'LS', 'SR5', 'S', 'SV', 'SL',
-            'Limited', 'Platinum', 'Premium', 'Prestige', 'Titanium',
-            'Sport', 'Elite', 'Signature', 'Base',
-        ]),
-        'other' => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
+        'byMake' => $out,
+        /* For a make not listed above — the Chinese brands, mostly, where the
+           badge is usually just a number. Short on purpose. */
+        'default' => array_map($badge, ['Base', 'Mid', 'Full', 'Comfort', 'Luxury', 'Sport', 'Premium']),
+        'other'  => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
     ];
 }
 
