@@ -53,17 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t('appName')),
-        actions: [
-          // One tap, both languages. The label always shows the language you
-          // would switch TO, which is the only version people read correctly.
-          TextButton(
-            onPressed: () => widget.prefs.setLang(lang == 'ar' ? 'en' : 'ar'),
-            child: Text(
-              lang == 'ar' ? 'EN' : 'ع',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-          ),
-        ],
+        actions: [_LanguageButton(prefs: widget.prefs)],
       ),
       body: IndexedStack(index: tab, children: pages),
       bottomNavigationBar: NavigationBar(
@@ -96,6 +86,62 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// The language switch.
+///
+/// It was plain maroon text in the corner, which measured 3.3:1 against the
+/// dark background — below the 4.5:1 small text needs, and in practice almost
+/// invisible at night. It is now a bordered chip: legible in both themes, and
+/// it reads as something you can press rather than a label.
+///
+/// The word shown is always the language you would switch **to**. That is the
+/// only version people read correctly.
+class _LanguageButton extends StatelessWidget {
+  const _LanguageButton({required this.prefs});
+
+  final Prefs prefs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? Brand.dBrandInk : Brand.brand;
+    final toArabic = prefs.lang == 'en';
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 10),
+      child: Material(
+        color: dark ? Brand.dTint : Brand.tint,
+        borderRadius: BorderRadius.circular(11),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(11),
+          onTap: () => prefs.setLang(toArabic ? 'ar' : 'en'),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 52, minHeight: 38),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: ink.withValues(alpha: 0.55)),
+            ),
+            child: Text(
+              toArabic ? 'ع' : 'EN',
+              // Each label is set in the face it is written in, whatever the
+              // app's current language — an "EN" in a naskh face looks wrong,
+              // and a lone "ع" in Poppins looks worse.
+              style: TextStyle(
+                fontFamily: toArabic ? 'Naskh' : 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: toArabic ? 19 : 15,
+                height: 1.1,
+                color: ink,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The first thing anyone sees: what this is, that it is free, and one button.
 class _EvaluateTab extends StatelessWidget {
   const _EvaluateTab({
@@ -123,17 +169,26 @@ class _EvaluateTab extends StatelessWidget {
         const SizedBox(height: 18),
 
         Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(
-              color: Brand.gold.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Brand.gold.withValues(alpha: 0.5)),
-            ),
-            child: Text(
-              t('freeBadge'),
-              style: const TextStyle(fontWeight: FontWeight.w700, color: Brand.gold),
-            ),
+          child: Builder(
+            builder: (context) {
+              final dark = theme.brightness == Brightness.dark;
+              // Gold is a fill, not an ink. On the pale tint it sits on, the
+              // gold itself is unreadable in light mode; the dark olive is the
+              // same colour family and can actually be read.
+              final ink = dark ? Brand.dGold : Brand.goldInk;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: (dark ? Brand.dGold : Brand.gold).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: ink.withValues(alpha: 0.45)),
+                ),
+                child: Text(
+                  t('freeBadge'),
+                  style: theme.textTheme.labelLarge?.copyWith(color: ink),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
