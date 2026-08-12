@@ -94,8 +94,10 @@ class _ThamanAppState extends State<ThamanApp> {
     return MaterialApp(
       title: 'Thaman Motorak',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(dark: false),
-      darkTheme: buildTheme(dark: true),
+      // The theme depends on the language, not only the brightness: Arabic and
+      // English are set in different faces and at different sizes.
+      theme: buildTheme(dark: false, arabic: rtl),
+      darkTheme: buildTheme(dark: true, arabic: rtl),
       locale: Locale(prefs.lang),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
