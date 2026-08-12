@@ -4,13 +4,19 @@ import 'package:flutter/services.dart';
 import '../config.dart';
 import '../state.dart';
 import '../theme.dart';
-import '../widgets/common.dart';
 
 /// "We have your request, here is your number."
 ///
 /// The six-character code is the only key a customer ever gets — there is no
 /// password and no account — so this screen exists to make it very hard to
 /// lose: large, copyable, and repeated in the email.
+///
+/// **One screen, no scrolling.** The first version pushed the two buttons below
+/// the fold behind a paragraph about junk mail, so the last thing a customer
+/// saw after finishing was a warning, and the thing they needed to press was
+/// off-screen. The junk-mail note is gone from here — it is still in the
+/// confirmation email, which is where somebody who has not received the email
+/// is not reading anyway.
 class SentScreen extends StatelessWidget {
   const SentScreen({
     super.key,
@@ -36,88 +42,116 @@ class SentScreen extends StatelessWidget {
         title: Text(t('sentTitle')),
         automaticallyImplyLeading: false,
       ),
-      // Without this the last button sat underneath Android's own navigation
-      // bar — reachable only by scrolling past the end, and on a phone with
-      // gesture navigation, fighting the back swipe to get there.
       body: SafeArea(
         top: false,
-        child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-        children: [
-          const Center(child: Icon(Icons.check_circle, size: 68, color: Brand.green)),
-          const SizedBox(height: 18),
-          Text(t('sentTitle'),
-              textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(t('sentSub'), textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 24),
+        child: LayoutBuilder(
+          builder: (context, box) {
+            // Everything is sized from the room actually available, so the two
+            // buttons stay on screen on a small phone instead of being pushed
+            // under the fold.
+            final short = box.maxHeight < 620;
+            final tick = (box.maxHeight * 0.09).clamp(46.0, 74.0);
+            final code = (box.maxWidth * 0.105).clamp(30.0, 44.0);
+            final gap = short ? 10.0 : 18.0;
 
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+            return Padding(
+              padding: EdgeInsets.fromLTRB(16, gap, 16, gap),
               child: Column(
                 children: [
-                  Text(t('yourId'), style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 10),
-                  SelectableText(
-                    id,
-                    textDirection: TextDirection.ltr,
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 6,
+                  Icon(Icons.check_circle, size: tick, color: Brand.green),
+                  SizedBox(height: gap * 0.7),
+
+                  Text(
+                    t('sentTitle'),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  SizedBox(height: gap * 0.35),
+                  Text(
+                    t('sentSub'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+
+                  const Spacer(),
+
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: short ? 16 : 24, horizontal: 16),
+                      child: Column(
+                        children: [
+                          Text(t('yourId'), style: theme.textTheme.bodySmall),
+                          SizedBox(height: short ? 6 : 10),
+                          FittedBox(
+                            child: SelectableText(
+                              id,
+                              textDirection: TextDirection.ltr,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: code,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 6,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: short ? 8 : 14),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(ClipboardData(text: id));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      lang == 'ar' ? 'تم النسخ' : 'Copied',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: Size.fromHeight(short ? 44 : 50),
+                            ),
+                            icon: const Icon(Icons.copy, size: 18),
+                            label: Text(lang == 'ar' ? 'نسخ الرقم' : 'Copy number'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: id));
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(lang == 'ar' ? 'تم النسخ' : 'Copied'),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.copy, size: 18),
-                    label: Text(lang == 'ar' ? 'نسخ الرقم' : 'Copy number'),
+                  SizedBox(height: gap * 0.6),
+
+                  Text(
+                    t('sentMail'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+
+                  const Spacer(),
+
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size.fromHeight(short ? 48 : 54),
+                    ),
+                    child: Text(t('checkNow')),
+                  ),
+                  SizedBox(height: short ? 8 : 10),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: Size.fromHeight(short ? 48 : 54),
+                    ),
+                    child: Text(t('another')),
                   ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          Text(t('sentMail'), textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 20),
-
-          // The junk-mail note is not an apology, it is instructions: the
-          // domain is young and Hotmail in particular files these messages
-          // away. A customer who presses "Not junk" once fixes it for good.
-          SectionCard(
-            title: t('junkT'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t('junkB'), style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 8),
-                Text(t('junkS'), style: theme.textTheme.bodySmall),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          FilledButton(
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-            child: Text(t('checkNow')),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-            child: Text(t('another')),
-          ),
-        ],
+            );
+          },
         ),
       ),
     );
