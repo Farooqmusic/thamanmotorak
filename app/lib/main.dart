@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'api.dart';
 import 'config.dart';
@@ -9,6 +10,17 @@ import 'state.dart';
 import 'theme.dart';
 
 void main() {
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+
+  // Hold the launch screen up.
+  //
+  // Generating it is only half the job. Left alone, Android takes it down the
+  // instant Flutter can draw — two or three hundred milliseconds on a modern
+  // phone — and a logo that appears and vanishes inside a blink reads as a
+  // glitch, not as a splash. This keeps it there until the app has the config
+  // and something real behind it. See `_dropSplash`.
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
+
   runApp(const ThamanApp());
 }
 
@@ -39,11 +51,27 @@ class _ThamanAppState extends State<ThamanApp> {
   /// a different car every day and people come back to see it.
   bool conceptSeen = false;
 
+  /// Long enough to be read as a splash rather than seen as a flicker.
+  static const _splashMin = Duration(milliseconds: 900);
+
+  /// And never longer than this, whatever the network is doing. A launch
+  /// screen that will not go away is worse than no launch screen at all.
+  static const _splashMax = Duration(seconds: 4);
+
+  bool _splashGone = false;
+
+  void _dropSplash() {
+    if (_splashGone) return;
+    _splashGone = true;
+    FlutterNativeSplash.remove();
+  }
+
   @override
   void initState() {
     super.initState();
     prefs.addListener(_refresh);
     _boot();
+    Future<void>.delayed(_splashMax, _dropSplash);
   }
 
   @override
@@ -61,6 +89,8 @@ class _ThamanAppState extends State<ThamanApp> {
   /// spinner. The cached config is a complete one — it was a real answer from
   /// the server on some earlier launch.
   Future<void> _boot() async {
+    final shown = Stopwatch()..start();
+
     await prefs.load();
     await draft.load();
 
@@ -90,6 +120,14 @@ class _ThamanAppState extends State<ThamanApp> {
         });
       }
     }
+
+    // The screen behind the launch screen is ready now. Give the mark the rest
+    // of its second if it has not had it, then hand over — on a fast phone and
+    // a cached config all of this takes almost no time at all, which is exactly
+    // the case that used to make the splash invisible.
+    final left = _splashMin - shown.elapsed;
+    if (left > Duration.zero) await Future<void>.delayed(left);
+    _dropSplash();
   }
 
   @override
