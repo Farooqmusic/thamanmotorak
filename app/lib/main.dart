@@ -137,6 +137,7 @@ class _ThamanAppState extends State<ThamanApp> {
     return MaterialApp(
       title: 'Thamanmotorak',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const _SteadyScroll(),
       // The theme depends on the language, not only the brightness: Arabic and
       // English are set in different faces and at different sizes.
       theme: buildTheme(dark: false, arabic: rtl),
@@ -204,6 +205,37 @@ class _ThamanAppState extends State<ThamanApp> {
     if (loading) return const _Splash();
     return _FirstRunFailed(lang: prefs.lang, onRetry: _boot, error: error);
   }
+}
+
+/// Why the forms stopped drifting.
+///
+/// Farooq's words: *"whole form is feeling floating, it is like moving slightly
+/// up and down"*. He was describing Android's overscroll: Material 3 answers a
+/// drag that cannot scroll anywhere by **stretching the whole page** and
+/// letting it spring back. On a screen full of boxes with a fixed button at the
+/// foot, every touch made the form breathe, and on the short steps — where
+/// there is nothing to scroll at all — the page moved when it should have been
+/// perfectly still.
+///
+/// It is worth being exact about which half of the scrolling machinery is at
+/// fault, because it is not the one you would guess. Android's physics were
+/// already clamped — the offset never actually went past the end. What moved
+/// was the *indicator*: Material 3 answers an over-drag by stretching the
+/// rendered content and springing it back, offset unchanged. So the fix is to
+/// take the indicator away and leave the physics alone, which also means iOS
+/// keeps the bounce Apple users expect when that build comes.
+///
+/// A list longer than the screen scrolls exactly as it did.
+class _SteadyScroll extends MaterialScrollBehavior {
+  const _SteadyScroll();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
 }
 
 class _Splash extends StatelessWidget {
