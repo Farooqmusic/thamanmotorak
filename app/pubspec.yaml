@@ -20,6 +20,14 @@ dependencies:
   # this app needs very little that Flutter does not already have.
   http: ^1.2.0             # the only network client we need
   image_picker: ^1.1.0     # camera + gallery, resizes before we ever hold the bytes
+
+  # Picking the inspection report — and the reason it is a second plugin
+  # rather than more image_picker: image_picker cannot open a PDF, and a
+  # «فحص» report arrives as a PDF at least as often as it arrives as a
+  # photograph. This is the Flutter team's own plugin (flutter/packages),
+  # not a third party's, which is the least this app can add and still let
+  # someone attach the document his garage emailed him.
+  file_selector: ^1.0.3
   shared_preferences: ^2.2.0  # cached config and the saved draft
   url_launcher: ^6.2.0     # terms, privacy, phone, Instagram
 
