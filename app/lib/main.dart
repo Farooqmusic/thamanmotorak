@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'api.dart';
 import 'config.dart';
@@ -9,18 +8,30 @@ import 'screens/splash.dart';
 import 'state.dart';
 import 'theme.dart';
 
+/// STOP FIGHTING THE NATIVE LAUNCH SCREEN — READ THIS BEFORE PUTTING IT BACK
+/// ------------------------------------------------------------------------
+/// Four builds were spent trying to make Android's own launch screen show the
+/// mark, and every one of them was judged on a phone in Doha because there is
+/// no way to see it from here. The window theme, the Android 12 system splash,
+/// `flutter_native_splash`, `preserve()` and `remove()` — each is a place the
+/// picture can silently not appear, and between them they cost two days.
+///
+/// So the splash is now **drawn by Flutter**, in [BrandSplash] at the bottom of
+/// this file: the mark grows from nothing to full width on the brand's
+/// near-black, holds, and dissolves into تصميم اليوم. It is ordinary widget
+/// code. It cannot be skipped by a build step, it does not depend on a theme
+/// attribute, and it behaves identically on every Android version and on iOS.
+///
+/// The native side still has one job and it is a job it cannot fail: paint
+/// `#131013` while the process starts, so there is no white flash before
+/// Flutter's first frame. `tool/splash_android.py` does that.
+///
+/// **`FlutterNativeSplash.preserve()` is deliberately gone.** It held Flutter's
+/// first frame back for 900 ms — which is exactly the 900 ms this animation
+/// wants to be running in. The package stays in `pubspec.yaml` for the iOS
+/// storyboard; nothing in the Dart calls it any more.
 void main() {
-  final binding = WidgetsFlutterBinding.ensureInitialized();
-
-  // Hold the launch screen up.
-  //
-  // Generating it is only half the job. Left alone, Android takes it down the
-  // instant Flutter can draw — two or three hundred milliseconds on a modern
-  // phone — and a logo that appears and vanishes inside a blink reads as a
-  // glitch, not as a splash. This keeps it there until the app has the config
-  // and something real behind it. See `_dropSplash`.
-  FlutterNativeSplash.preserve(widgetsBinding: binding);
-
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ThamanApp());
 }
 
@@ -51,27 +62,18 @@ class _ThamanAppState extends State<ThamanApp> {
   /// a different car every day and people come back to see it.
   bool conceptSeen = false;
 
-  /// Long enough to be read as a splash rather than seen as a flicker.
-  static const _splashMin = Duration(milliseconds: 900);
-
-  /// And never longer than this, whatever the network is doing. A launch
-  /// screen that will not go away is worse than no launch screen at all.
-  static const _splashMax = Duration(seconds: 4);
-
-  bool _splashGone = false;
-
-  void _dropSplash() {
-    if (_splashGone) return;
-    _splashGone = true;
-    FlutterNativeSplash.remove();
-  }
+  /// False until the brand animation has played and faded out.
+  ///
+  /// It runs on its own clock, not on the network's. Whether the config comes
+  /// from the cache in four milliseconds or from Doha in three seconds, the
+  /// customer sees the same opening.
+  bool brandSplashDone = false;
 
   @override
   void initState() {
     super.initState();
     prefs.addListener(_refresh);
     _boot();
-    Future<void>.delayed(_splashMax, _dropSplash);
   }
 
   @override
@@ -89,8 +91,6 @@ class _ThamanAppState extends State<ThamanApp> {
   /// spinner. The cached config is a complete one — it was a real answer from
   /// the server on some earlier launch.
   Future<void> _boot() async {
-    final shown = Stopwatch()..start();
-
     await prefs.load();
     await draft.load();
 
@@ -120,14 +120,6 @@ class _ThamanAppState extends State<ThamanApp> {
         });
       }
     }
-
-    // The screen behind the launch screen is ready now. Give the mark the rest
-    // of its second if it has not had it, then hand over — on a fast phone and
-    // a cached config all of this takes almost no time at all, which is exactly
-    // the case that used to make the splash invisible.
-    final left = _splashMin - shown.elapsed;
-    if (left > Duration.zero) await Future<void>.delayed(left);
-    _dropSplash();
   }
 
   @override
@@ -175,7 +167,23 @@ class _ThamanAppState extends State<ThamanApp> {
           ),
         );
       },
-      home: _root(),
+      // The brand animation sits over everything, including تصميم اليوم, and
+      // dissolves to reveal whichever of them is ready underneath. Because the
+      // app is being built the whole time it is playing, lifting it shows a
+      // finished screen rather than the start of one.
+      home: Stack(
+        children: [
+          _root(),
+          if (!brandSplashDone)
+            BrandSplash(
+              onDone: () {
+                if (mounted && !brandSplashDone) {
+                  setState(() => brandSplashDone = true);
+                }
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -309,6 +317,147 @@ class _FirstRunFailed extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+/// The splash the customer actually sees — drawn by Flutter, not by Android.
+///
+/// Farooq, about his client: *"he likes splash splash"*. Four builds went into
+/// Android's own launch screen and none of them could be checked without
+/// putting an APK on a phone in Doha. This one is widget code: it runs the same
+/// on Android 9 and Android 15, it runs on iOS, and there is no build step that
+/// can quietly leave it out.
+///
+/// **The move he asked for — «coming from nothing to big on screen».** The mark
+/// starts at a quarter size and invisible, grows to full width over nine tenths
+/// of a second on an ease-out so it arrives softly rather than snapping, keeps
+/// swelling very slightly while it is held — enough that the screen is alive
+/// and not a photograph — and then blooms a little further as the whole thing
+/// dissolves into تصميم اليوم. One movement from start to finish, no bounce, no
+/// spin. About 1.9 seconds, which is long enough to be a splash and short
+/// enough not to be a toll gate.
+///
+/// It is drawn on `Brand.dBg`, the same near-black the native window is painted
+/// by `tool/splash_android.py`, so there is no seam where one hands over to the
+/// other and no white flash at any point of the launch.
+///
+/// **The artwork is `assets/brand/splash-mark.png` and it has no background of
+/// its own.** Farooq: *"even when you trying splash you cover his complete logo
+/// with black blurry cloud"*. He was right, and the cause was the picture, not
+/// the code — the file we were given is the gold TMK badge photographed on a
+/// dark textured card, so painting it on the app's own near-black left a faint
+/// rectangle of somebody else's grey sitting behind the client's logo. The gold
+/// has been cut off that card: the badge is warm and the card is neutral grey,
+/// which separates them cleanly, and every backdrop pixel came out fully
+/// transparent. What is on screen now is the mark itself, on the brand colour,
+/// and nothing else.
+class BrandSplash extends StatefulWidget {
+  const BrandSplash({super.key, required this.onDone});
+
+  /// Called once, after the fade has finished, so the parent can drop this
+  /// widget out of the tree.
+  final VoidCallback onDone;
+
+  @override
+  State<BrandSplash> createState() => _BrandSplashState();
+}
+
+class _BrandSplashState extends State<BrandSplash>
+    with SingleTickerProviderStateMixin {
+  /// grow 900ms · hold 600ms · dissolve 400ms.
+  static const _total = Duration(milliseconds: 1900);
+
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: _total,
+  )
+    ..addStatusListener((status) {
+      if (status != AnimationStatus.completed) return;
+      // After the frame, not inside it: this callback ends with the parent
+      // removing this widget, which disposes the controller that is currently
+      // notifying us.
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onDone());
+    })
+    ..forward();
+
+  /// 0.22 → 1.00 → 1.05 → 1.14, across the three phases. It ends larger than
+  /// it settles, so the last thing that happens is the mark opening out into
+  /// the screen rather than simply switching off.
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 0.22, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 47,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.0, end: 1.05)
+          .chain(CurveTween(curve: Curves.easeInOut)),
+      weight: 32,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.05, end: 1.14)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 21,
+    ),
+  ]).animate(_c);
+
+  /// The mark arrives a touch after the movement starts, so it reads as
+  /// emerging rather than as being switched on.
+  late final Animation<double> _markIn = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0.02, 0.34, curve: Curves.easeOut),
+  );
+
+  /// The whole screen, dissolving.
+  late final Animation<double> _out = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0.79, 1, curve: Curves.easeIn),
+  );
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final gone = _out.value;
+        if (gone >= 1) return const SizedBox.shrink();
+
+        return Opacity(
+          opacity: 1 - gone,
+          child: Material(
+            // Opaque: nothing behind this may show through while it plays.
+            color: Brand.dBg,
+            child: Center(
+              child: Opacity(
+                opacity: _markIn.value,
+                child: Transform.scale(
+                  scale: _scale.value,
+                  child: SizedBox(
+                    width: width * 0.72,
+                    child: Image.asset(
+                      'assets/brand/splash-mark.png',
+                      fit: BoxFit.contain,
+                      // The mark is a fixed asset at a known size; letting it
+                      // filter smoothly matters more than the last microsecond.
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
