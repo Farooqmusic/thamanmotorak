@@ -8,16 +8,17 @@ import '../theme.dart';
 
 /// تصميم اليوم — the concept car the site opens on, now opening the app too.
 ///
-/// Two demands that sound like one: the screen must be **full**, and the car
-/// must be **whole**. A single image can only do one — `cover` fills the screen
-/// and slices the nose off the car, `contain` keeps the car and leaves bars.
+/// The picture owns the screen. It is not given the space left over after the
+/// words have taken theirs — that was the mistake in the first two attempts,
+/// and it is why the car sat in the middle with dark bands down each side no
+/// matter what size the photograph was. The layout was the problem, not the
+/// image.
 ///
-/// So the photograph is painted twice. Once blurred and cropped to `cover`,
-/// filling every pixel behind everything; once sharp and `contain`ed on top,
-/// edge to edge across the full width of the phone, whole. The blur is the
-/// car's own colours, so the two read as one picture and there is no bar, no
-/// border and no frame — nothing that makes it look like a photograph sitting
-/// in a card.
+/// So: the photograph is painted across the full width of the phone, edge to
+/// edge, and everything readable floats on top of it. A blurred, cropped copy
+/// of the same photograph sits behind to fill the strips above and below —
+/// its own colours, so the screen reads as one picture rather than a picture
+/// with margins. Nothing of the car is cropped and nothing is letterboxed.
 ///
 /// The gold button is the last thing on the screen, where a thumb already rests.
 class ConceptSplash extends StatefulWidget {
@@ -76,11 +77,6 @@ class _ConceptSplashState extends State<ConceptSplash>
         ? concept.button(lang)
         : (lang == 'ar' ? 'ابدأ التقييم المجاني' : 'Start free valuation');
 
-    // The words are inset from the edges. The car is not — it runs the full
-    // width of the phone, so padding is put on each text widget rather than
-    // on the column that holds them all.
-    const side = EdgeInsets.symmetric(horizontal: 20);
-
     return AnimatedBuilder(
       animation: _c,
       builder: (context, child) => Opacity(
@@ -96,19 +92,80 @@ class _ConceptSplashState extends State<ConceptSplash>
           fit: StackFit.expand,
           children: [
             // Layer 1 — the same picture, blurred and cropped to fill every
-            // pixel. It is never looked at directly; it exists so the screen
-            // has no empty edges and no black bars.
+            // pixel. It is never looked at directly; it is there so the strips
+            // above and below the car are the car's own colours instead of a
+            // black bar.
             Image.network(
               concept.image,
               fit: BoxFit.cover,
               errorBuilder: (context, _, __) => const SizedBox.shrink(),
             ),
             BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 38, sigmaY: 38),
-              child: Container(color: Brand.dBg.withValues(alpha: 0.72)),
+              filter: ImageFilter.blur(sigmaX: 42, sigmaY: 42),
+              child: Container(color: Brand.dBg.withValues(alpha: 0.55)),
             ),
 
-            // Layer 2 — everything you actually read, over the top.
+            // Layer 2 — the car itself, sharp, across the whole width of the
+            // phone. `fitWidth` is the point: the picture is as wide as the
+            // screen and as tall as that makes it, so no pixel of the car is
+            // ever cut off the sides and there is no box around it.
+            Positioned.fill(
+              child: Image.network(
+                concept.image,
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.center,
+                frameBuilder: (context, child, frame, wasSync) =>
+                    AnimatedOpacity(
+                  opacity: (wasSync || frame != null) ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: child,
+                ),
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : const Center(
+                        child: SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Brand.gold,
+                          ),
+                        ),
+                      ),
+                errorBuilder: (context, _, __) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => setState(() => failed = true),
+                  );
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+
+            // Layer 3 — the scrim.
+            //
+            // White type on a photograph is unreadable wherever the photograph
+            // happens to be pale. This darkens the two bands the words sit in
+            // and leaves the middle alone, so the car is not dimmed for the
+            // sake of a caption.
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xE6000000),
+                    Color(0x99000000),
+                    Color(0x00000000),
+                    Color(0x00000000),
+                    Color(0xA6000000),
+                    Color(0xF2000000),
+                  ],
+                  stops: [0.0, 0.14, 0.30, 0.52, 0.74, 1.0],
+                ),
+              ),
+            ),
+
+            // Layer 4 — everything you actually read.
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, box) {
@@ -117,95 +174,57 @@ class _ConceptSplashState extends State<ConceptSplash>
                   final hero = (box.maxWidth * 0.062).clamp(19.0, 27.0);
 
                   return Padding(
-                    padding: EdgeInsets.only(
-                        top: short ? 10 : 18, bottom: short ? 12 : 20),
+                    padding: EdgeInsets.fromLTRB(
+                        20, short ? 10 : 18, 20, short ? 12 : 20),
                     child: Column(
                       children: [
                         // ------------------------------------------- the mark
                         Image.asset('assets/brand/logo-mark.png', height: logo),
                         SizedBox(height: short ? 4 : 8),
-                        Padding(
-                          padding: side,
-                          child: Text(
-                            t('appName'),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontFamily: font,
-                              fontSize: (box.maxWidth * 0.055).clamp(17.0, 24.0),
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
+                        Text(
+                          t('appName'),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontFamily: font,
+                            fontSize: (box.maxWidth * 0.055).clamp(17.0, 24.0),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            shadows: const [
+                              Shadow(blurRadius: 12, color: Color(0xCC000000)),
+                            ],
                           ),
                         ),
                         if (!short) ...[
                           const SizedBox(height: 2),
-                          Padding(
-                            padding: side,
-                            child: Text(
-                              t('tagline'),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: font,
-                                fontSize: 12.5,
-                                color: const Color(0xB3FFFFFF),
-                              ),
+                          Text(
+                            t('tagline'),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: font,
+                              fontSize: 12.5,
+                              color: const Color(0xCCFFFFFF),
+                              shadows: const [
+                                Shadow(blurRadius: 10, color: Color(0xB3000000)),
+                              ],
                             ),
                           ),
                         ],
 
-                        // -------------------------------------------- the car
-                        //
-                        // Every pixel left between the name and the badge, the
-                        // full width of the phone, and not one pixel of the car
-                        // cropped. No rounded corners and no inset: those are
-                        // what made it look like a picture in a frame.
-                        Expanded(
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: Image.network(
-                              concept.image,
-                              fit: BoxFit.contain,
-                              frameBuilder: (context, child, frame, wasSync) =>
-                                  AnimatedOpacity(
-                                opacity: (wasSync || frame != null) ? 1 : 0,
-                                duration: const Duration(milliseconds: 300),
-                                child: child,
-                              ),
-                              loadingBuilder: (context, child, progress) =>
-                                  progress == null
-                                      ? child
-                                      : const Center(
-                                          child: SizedBox(
-                                            width: 26,
-                                            height: 26,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.2,
-                                              color: Brand.gold,
-                                            ),
-                                          ),
-                                        ),
-                              errorBuilder: (context, _, __) {
-                                WidgetsBinding.instance.addPostFrameCallback(
-                                  (_) => setState(() => failed = true),
-                                );
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                          ),
-                        ),
+                        // The car shows through everything between here…
+                        const Spacer(),
 
-                        // ------------------------------------------ the words
+                        // …and here.
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Brand.gold.withValues(alpha: 0.17),
+                            color: Brand.gold.withValues(alpha: 0.20),
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                                color: Brand.gold.withValues(alpha: 0.5)),
+                                color: Brand.gold.withValues(alpha: 0.55)),
                           ),
                           child: Text(
                             t('freeBadge'),
@@ -219,72 +238,66 @@ class _ConceptSplashState extends State<ConceptSplash>
                         ),
                         SizedBox(height: short ? 8 : 12),
 
-                        Padding(
-                          padding: side,
-                          child: Text(
-                            t('heroTitle'),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: font,
-                              fontSize: hero,
-                              height: 1.35,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
+                        Text(
+                          t('heroTitle'),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: font,
+                            fontSize: hero,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            shadows: const [
+                              Shadow(blurRadius: 14, color: Color(0xCC000000)),
+                            ],
                           ),
                         ),
                         SizedBox(height: short ? 6 : 8),
 
-                        // One line, whatever it takes.
-                        //
-                        // This sentence is edited in the control panel, so its
-                        // length is not ours to decide. Wrapping it broke the
-                        // shape of the screen; ellipsis threw away the end of
-                        // Khalid's own words. FittedBox keeps every word and
-                        // shrinks the type until it fits the width.
-                        Padding(
-                          padding: side,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              t('heroSub'),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              softWrap: false,
-                              style: TextStyle(
-                                fontFamily: font,
-                                fontSize: 13.5,
-                                height: 1.5,
-                                color: const Color(0xCCFFFFFF),
-                              ),
+                        // One line, whatever it takes. The sentence is edited
+                        // in the control panel, so its length is not ours to
+                        // decide — the type shrinks rather than wrapping or
+                        // throwing away the end of Khalid's own words.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            t('heroSub'),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontFamily: font,
+                              fontSize: 13.5,
+                              height: 1.5,
+                              color: const Color(0xE6FFFFFF),
+                              shadows: const [
+                                Shadow(blurRadius: 10, color: Color(0xB3000000)),
+                              ],
                             ),
                           ),
                         ),
                         SizedBox(height: short ? 10 : 14),
 
                         // ----------------------------------------- the button
-                        Padding(
-                          padding: side,
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _lift,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Brand.gold,
-                                foregroundColor: Brand.goldInk,
-                                minimumSize: Size.fromHeight(short ? 52 : 58),
-                              ),
-                              child: Text(
-                                label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontFamily: font,
-                                  fontSize: short ? 15 : 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _lift,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Brand.gold,
+                              foregroundColor: Brand.goldInk,
+                              minimumSize: Size.fromHeight(short ? 52 : 58),
+                            ),
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: font,
+                                fontSize: short ? 15 : 17,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
