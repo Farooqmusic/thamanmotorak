@@ -101,6 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// The first thing anyone sees: what this is, that it is free, and one button.
+///
+/// The button does not scroll. It is pinned to the foot of the screen, above
+/// the tab bar, where a thumb already is — reading the four steps should never
+/// be what stands between someone and starting. Everything above it scrolls
+/// under it.
+///
+/// The privacy card that used to sit at the bottom is gone. The same words are
+/// on the Info tab, and saying them twice in one app made the first screen
+/// longer without telling anyone anything new.
 class _EvaluateTab extends StatelessWidget {
   const _EvaluateTab({
     required this.config,
@@ -120,116 +129,131 @@ class _EvaluateTab extends StatelessWidget {
     String t(String k) => config.t(k, lang);
     final theme = Theme.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+    return Column(
       children: [
-        Center(child: Image.asset('assets/brand/logo-mark.png', width: 96)),
-        const SizedBox(height: 18),
-
-        Center(
-          child: Builder(
-            builder: (context) {
-              final dark = theme.brightness == Brightness.dark;
-              // Gold is a fill, not an ink. On the pale tint it sits on, the
-              // gold itself is unreadable in light mode; the dark olive is the
-              // same colour family and can actually be read.
-              final ink = dark ? Brand.dGold : Brand.goldInk;
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: (dark ? Brand.dGold : Brand.gold).withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: ink.withValues(alpha: 0.45)),
-                ),
-                child: Text(
-                  t('freeBadge'),
-                  style: theme.textTheme.labelLarge?.copyWith(color: ink),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Text(
-          t('heroTitle'),
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineSmall?.copyWith(fontSize: 26),
-        ),
-        const SizedBox(height: 10),
-        Text(t('heroSub'), textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-        const SizedBox(height: 24),
-
-        // Picking the form back up matters more than starting it: someone who
-        // took five photographs and was interrupted will not do it twice.
-        ListenableBuilder(
-          listenable: draft,
-          builder: (context, _) {
-            final resume = draft.hasContent;
-            return Column(
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _open(context),
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: Text(resume
-                      ? (lang == 'ar' ? 'متابعة الطلب' : 'Continue your request')
-                      : t('navEval')),
-                ),
-                if (resume) ...[
-                  const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () async {
-                      await draft.clear();
-                      if (context.mounted) _open(context);
-                    },
-                    child: Text(lang == 'ar' ? 'ابدأ من جديد' : 'Start over'),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 26),
-
-        SectionCard(
-          title: t('infoTitle'),
-          child: Column(
+        // ------------------------------------------------ everything that reads
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             children: [
-              for (var i = 1; i <= 4; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          t('step${i}k'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+              Center(child: Image.asset('assets/brand/logo-mark.png', width: 96)),
+              const SizedBox(height: 18),
+
+              Center(
+                child: Builder(
+                  builder: (context) {
+                    final dark = theme.brightness == Brightness.dark;
+                    // Gold is a fill, not an ink. On the pale tint it sits on, the
+                    // gold itself is unreadable in light mode; the dark olive is the
+                    // same colour family and can actually be read.
+                    final ink = dark ? Brand.dGold : Brand.goldInk;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: (dark ? Brand.dGold : Brand.gold).withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: ink.withValues(alpha: 0.45)),
+                      ),
+                      child: Text(
+                        t('freeBadge'),
+                        style: theme.textTheme.labelLarge?.copyWith(color: ink),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                t('heroTitle'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall?.copyWith(fontSize: 26),
+              ),
+              const SizedBox(height: 10),
+              Text(t('heroSub'), textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 24),
+
+              SectionCard(
+                title: t('infoTitle'),
+                child: Column(
+                  children: [
+                    for (var i = 1; i <= 4; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                t('step${i}k'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(t('step${i}v'), style: theme.textTheme.bodyMedium)),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text(t('step${i}v'), style: theme.textTheme.bodyMedium)),
-                    ],
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
 
-        SectionCard(
-          title: t('privTitle'),
-          child: Text(t('privBody'), style: theme.textTheme.bodyMedium),
+        // ------------------------------------------------------------ the button
+        //
+        // Outside the scroll view on purpose: it is always on the screen, at the
+        // foot of it, whatever the customer has scrolled to.
+        //
+        // Picking the form back up matters more than starting it: someone who
+        // took five photographs and was interrupted will not do it twice.
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: ListenableBuilder(
+              listenable: draft,
+              builder: (context, _) {
+                final resume = draft.hasContent;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _open(context),
+                        icon: const Icon(Icons.photo_camera_outlined),
+                        label: Text(resume
+                            ? (lang == 'ar' ? 'متابعة الطلب' : 'Continue your request')
+                            : t('navEval')),
+                      ),
+                    ),
+                    if (resume) ...[
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: () async {
+                          await draft.clear();
+                          if (context.mounted) _open(context);
+                        },
+                        child: Text(lang == 'ar' ? 'ابدأ من جديد' : 'Start over'),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ],
     );
