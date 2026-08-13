@@ -109,11 +109,20 @@ class _ConceptSplashState extends State<ConceptSplash>
             // phone. `fitWidth` is the point: the picture is as wide as the
             // screen and as tall as that makes it, so no pixel of the car is
             // ever cut off the sides and there is no box around it.
+            // Anchored to the TOP, not the middle.
+            //
+            // The picture is 768×1376 and the phone is 945×2048 — a taller
+            // shape. Made as wide as the screen it still comes up about 350px
+            // short, and centred that left a visible strip of blur above the
+            // logo which read as a gap. Pushed to the top there is no strip up
+            // there at all: the photograph starts at the very first pixel,
+            // behind the status bar, and what is left over falls to the bottom
+            // where the scrim is nearly black and the button sits on top of it.
             Positioned.fill(
               child: Image.network(
                 concept.image,
                 fit: BoxFit.fitWidth,
-                alignment: Alignment.center,
+                alignment: Alignment.topCenter,
                 frameBuilder: (context, child, frame, wasSync) =>
                     AnimatedOpacity(
                   opacity: (wasSync || frame != null) ? 1 : 0,
