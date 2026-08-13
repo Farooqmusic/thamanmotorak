@@ -392,28 +392,26 @@ workflows:
       flutter: *flutter_version
       xcode: latest
       cocoapods: default
-      groups:
-        # Needs an App Store Connect API key (Users and Access → Keys).
-        # Codemagic then handles certificates and profiles itself, which
-        # is the only sane way to do Apple signing on a build machine.
-        - appstore_credentials
+      # The same App Store Connect key the ad-hoc workflow uses. One key,
+      # added once, named `thamanmotorak` in Codemagic. Codemagic creates the
+      # distribution certificate and the App Store profile from it, which is
+      # the only sane way to do Apple signing on a build machine.
+      integrations:
+        app_store_connect: thamanmotorak
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.thamanmotorak.app
 
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
+    # Started by hand, like the ad-hoc one. It used to build on every push to
+    # main, which would have meant every Android fix silently spending a second
+    # mac build and pushing another number at TestFlight. iOS goes up when
+    # there is something worth testers looking at.
 
     scripts:
       - *generate_platform_folders
       - *pub_get
       - *icons
       - *splash
-      - *splash_android
       - *analyze
       - *test
 
@@ -443,6 +441,17 @@ workflows:
           success: true
           failure: true
 
-      # app_store_connect:
-      #   auth: integration
-      #   submit_to_testflight: true
+      # Straight into TestFlight.
+      #
+      # `auth: integration` means the key named above, so there is nothing else
+      # to configure. **Internal testers get the build with no Apple review** —
+      # usually within half an hour of the build finishing, and it arrives in
+      # the TestFlight app and updates itself from then on. Only *external*
+      # testers go through Beta App Review.
+      #
+      # The app record must already exist in App Store Connect with the bundle
+      # id com.thamanmotorak.app, or the upload is rejected with a message that
+      # does not obviously say so.
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
