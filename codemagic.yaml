@@ -44,6 +44,18 @@ definitions:
       # left a white rectangle between the icon and the app.
       script: cd app && dart run flutter_native_splash:create
 
+    - &splash_android
+      name: Launch screen — Android, written by us
+      # Runs AFTER the generator on purpose, so that what we decided wins.
+      #
+      # Three builds shipped with the generator configured correctly and three
+      # builds showed nothing branded on launch. This step writes the drawable,
+      # the colour and the four style files itself, prints every one of them,
+      # and fails the build if any is missing. See app/tool/splash_android.py
+      # for what Android 12 changed and why the window background matters as
+      # much as the system splash does.
+      script: cd app && python3 tool/splash_android.py
+
     - &analyze
       name: Analyse
       # Forty seconds here saves a six-minute build that was going to
@@ -107,7 +119,14 @@ workflows:
 
       - *pub_get
       - *icons
-      - *splash
+      # No *splash here. The generator is kept for iOS, where it writes the
+      # storyboard and does its job; on Android it wrote a launch screen that
+      # three builds proved nobody ever saw, and everything it leaves behind —
+      # a 1152 px PNG in five density buckets, an orphaned launch_background,
+      # and a second writer for values/colors.xml that flutter_launcher_icons
+      # also owns — is dead weight inside the APK at best and a resource clash
+      # at worst. splash_android.py writes the whole Android side itself.
+      - *splash_android
       - *analyze
       - *test
 
@@ -121,6 +140,48 @@ workflows:
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$BUILD_NUMBER \
             --dart-define=APP_VERSION=1.0.$BUILD_NUMBER
+
+      # Three builds were installed on a real phone before anybody could say
+      # whether the launch screen was in them. This prints the answer in the
+      # log, so the fourth one is checked here and not in Doha.
+      - name: Prove the launch screen is in the APK
+        script: |
+          cd app
+          RES=android/app/src/main/res
+          echo "--- the files that went into this build ---"
+          find "$RES" -name 'tmk_*' -o -name 'styles.xml' | sort
+          echo
+          echo "--- values-v31/styles.xml ---"
+          cat "$RES/values-v31/styles.xml"
+          echo
+          echo "--- values/styles.xml ---"
+          cat "$RES/values/styles.xml"
+
+          # Hard checks. These are the four facts the launch screen depends on,
+          # and any one of them missing means the build is not worth installing.
+          for f in "$RES/values/styles.xml" "$RES/values-v31/styles.xml" \
+                   "$RES/drawable/tmk_launch_background.xml" \
+                   "$RES/drawable-xxxhdpi/tmk_splash_logo.png" \
+                   "$RES/drawable-xxxhdpi/tmk_splash_icon.png"; do
+            [ -s "$f" ] || { echo "MISSING: $f"; exit 1; }
+          done
+          grep -q 'tmk_launch_background' "$RES/values/styles.xml" \
+            || { echo "values/styles.xml does not reference the launch drawable"; exit 1; }
+          # NormalTheme is the one that actually shows during the hold — see
+          # tool/splash_android.py. Two matches means both themes carry it.
+          [ "$(grep -c 'tmk_launch_background' "$RES/values/styles.xml")" -ge 2 ] \
+            || { echo "NormalTheme is not branded — this is the bug we just fixed"; exit 1; }
+          grep -q 'tmk_splash_icon' "$RES/values-v31/styles.xml" \
+            || { echo "the Android 12 splash icon is not referenced"; exit 1; }
+          echo
+          echo "Launch screen: all five files present, both themes branded."
+
+          # Soft, for the record: what the packaged APK says about it.
+          echo "--- resource names found inside the APK ---"
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          { unzip -p "$APK" resources.arsc | strings -a | grep -o 'tmk_[a-z_]*' ; \
+            unzip -p "$APK" resources.arsc | strings -a -el | grep -o 'tmk_[a-z_]*' ; } \
+            | sort -u || echo "(strings found none — the checks above are the ones that count)"
 
       - name: Build App Bundle
         script: |
@@ -196,6 +257,7 @@ workflows:
       - *pub_get
       - *icons
       - *splash
+      - *splash_android
       - *analyze
       - *test
 
