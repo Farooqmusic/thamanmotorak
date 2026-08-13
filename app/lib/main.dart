@@ -336,8 +336,12 @@ class _FirstRunFailed extends StatelessWidget {
 /// swelling very slightly while it is held — enough that the screen is alive
 /// and not a photograph — and then blooms a little further as the whole thing
 /// dissolves into تصميم اليوم. One movement from start to finish, no bounce, no
-/// spin. About 1.9 seconds, which is long enough to be a splash and short
-/// enough not to be a toll gate.
+/// spin. Four seconds, at Farooq's asking — the first cut ran in under two and
+/// he came back with *"it is very fast… can we make it little slower"*. The
+/// extra time went almost entirely into the hold rather than into the growth:
+/// a mark that takes four seconds to get big feels like a slow phone, whereas
+/// one that arrives in a second and a half and is then simply left up feels
+/// deliberate. So it grows in 1.4s, is held for 2.1s, and dissolves in 0.5s.
 ///
 /// It is drawn on `Brand.dBg`, the same near-black the native window is painted
 /// by `tool/splash_android.py`, so there is no seam where one hands over to the
@@ -366,8 +370,8 @@ class BrandSplash extends StatefulWidget {
 
 class _BrandSplashState extends State<BrandSplash>
     with SingleTickerProviderStateMixin {
-  /// grow 900ms · hold 600ms · dissolve 400ms.
-  static const _total = Duration(milliseconds: 1900);
+  /// grow 1400ms · hold 2100ms · dissolve 500ms.
+  static const _total = Duration(milliseconds: 4000);
 
   late final AnimationController _c = AnimationController(
     vsync: this,
@@ -384,22 +388,24 @@ class _BrandSplashState extends State<BrandSplash>
 
   /// 0.22 → 1.00 → 1.05 → 1.14, across the three phases. It ends larger than
   /// it settles, so the last thing that happens is the mark opening out into
-  /// the screen rather than simply switching off.
+  /// the screen rather than simply switching off. The middle phase is a very
+  /// slow swell — five per cent over two seconds, barely a movement — which is
+  /// what stops a long hold from reading as a frozen screen.
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
       tween: Tween<double>(begin: 0.22, end: 1.0)
           .chain(CurveTween(curve: Curves.easeOutCubic)),
-      weight: 47,
+      weight: 35,
     ),
     TweenSequenceItem(
       tween: Tween<double>(begin: 1.0, end: 1.05)
           .chain(CurveTween(curve: Curves.easeInOut)),
-      weight: 32,
+      weight: 53,
     ),
     TweenSequenceItem(
       tween: Tween<double>(begin: 1.05, end: 1.14)
           .chain(CurveTween(curve: Curves.easeIn)),
-      weight: 21,
+      weight: 12,
     ),
   ]).animate(_c);
 
@@ -407,13 +413,13 @@ class _BrandSplashState extends State<BrandSplash>
   /// emerging rather than as being switched on.
   late final Animation<double> _markIn = CurvedAnimation(
     parent: _c,
-    curve: const Interval(0.02, 0.34, curve: Curves.easeOut),
+    curve: const Interval(0.015, 0.20, curve: Curves.easeOut),
   );
 
   /// The whole screen, dissolving.
   late final Animation<double> _out = CurvedAnimation(
     parent: _c,
-    curve: const Interval(0.79, 1, curve: Curves.easeIn),
+    curve: const Interval(0.88, 1, curve: Curves.easeIn),
   );
 
   @override
