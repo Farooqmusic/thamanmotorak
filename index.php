@@ -134,6 +134,12 @@ document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
           <div class="row2">
             <div class="field">
               <label data-i18n="fModel">الموديل / الفئة الفرعية</label>
+              <!-- filled by app.js from assets/trims.js — the same file
+                   appapi.php parses for the app, so the trims offered here
+                   and the trims offered on a phone are the same list.
+                   A model with no real trims hides this select and leaves
+                   the box below, exactly as the field behaved before. -->
+              <select id="trimSel" hidden></select>
               <input id="car_model" autocomplete="off" dir="ltr" placeholder="LT Premium">
             </div>
             <div class="field">
@@ -567,6 +573,7 @@ window.APP_CFG = {
 };
 </script>
 <script src="<?= asset('assets/cars.js') ?>"></script>
+<script src="<?= asset('assets/trims.js') ?>"></script>
 <script src="<?= asset('assets/app.js') ?>"></script>
 <script>
 /* ------------------------------------------------------------------

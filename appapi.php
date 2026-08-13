@@ -183,114 +183,67 @@ function app_trims(): array
        hundreds of models and their trims change by year and by importer.
        It covers what actually arrives through the form. Add to it freely —
        every phone picks the change up on next launch. */
-    $byModel = [
-        // --- Toyota ---------------------------------------------------
-        'Land Cruiser'      => ['GX', 'GXR', 'GXR-V', 'VX', 'VXR', 'VX-R', 'GR Sport'],
-        'Land Cruiser 70'   => ['LX', 'GX', 'GXR'],
-        'Prado'             => ['TX', 'TXL', 'VX', 'VXR', 'GX'],
-        'Fortuner'          => ['GX', 'GXR', 'VXR', 'Legender'],
-        'Camry'             => ['GL', 'GLE', 'SE', 'Limited', 'Grande'],
-        'Corolla'           => ['XLI', 'GLI', 'SE', 'LE', 'Elite'],
-        'Hilux'             => ['GL', 'GLX', 'SR5', 'Adventure', 'GR Sport'],
-        'RAV4'              => ['LE', 'XLE', 'Limited', 'Adventure'],
-        'Yaris'             => ['E', 'Y', 'Y Plus', 'SE'],
-        'Highlander'        => ['LE', 'XLE', 'Limited', 'Platinum'],
-        'Tundra'            => ['SR5', 'Limited', 'Platinum', '1794', 'TRD Pro'],
-        'Rush'              => ['E', 'G', 'S'],
+    /* ------------------------------------------------------------------
+       Real trims, fetched from qatarsale.com on 13 Aug 2026 and not edited
+       by hand afterwards. Nothing here was written from memory: every badge
+       below appears on a real listing for that exact model in Qatar.
 
-        // --- Lexus ----------------------------------------------------
-        'LX'                => ['Standard', 'Premier', 'Sport', 'F Sport', 'VIP'],
-        'GX'                => ['Premier', 'Sport', 'Overtrail'],
-        'RX'                => ['Standard', 'Premier', 'F Sport', 'Luxury'],
-        'ES'                => ['Standard', 'Premier', 'Platinum', 'F Sport'],
-        'NX'                => ['Standard', 'Premier', 'F Sport'],
+       Keyed by the model names in assets/cars.js, so the dropdown looks the
+       trim list up with the same string the customer just picked. 497 of the
+       730 models in cars.js have data; the rest genuinely have none on the
+       source, and «أخرى — اكتب الفئة» covers them. A gap is left as a gap.
 
-        // --- Nissan ---------------------------------------------------
-        'Patrol'            => ['XE', 'SE', 'SE Platinum', 'LE', 'LE Platinum', 'Nismo'],
-        'Patrol Safari'     => ['GL', 'Super Safari'],
-        'X-Trail'           => ['S', 'SV', 'SL'],
-        'Altima'            => ['S', 'SV', 'SL', 'SR'],
-        'Sunny'             => ['S', 'SV', 'SL'],
-        'Pathfinder'        => ['S', 'SV', 'SL', 'Platinum'],
+       To refresh: run tools-win/fetch-trims.bat and paste the new array in.
+       ------------------------------------------------------------------ */
+    /* ------------------------------------------------------------------
+       The trims live in assets/trims.js, not here.
 
-        // --- Mitsubishi -----------------------------------------------
-        'Pajero'            => ['GLS', 'GLX', 'Standard'],
-        'Montero Sport'     => ['GLS', 'GLX'],
-        'L200'              => ['GL', 'GLS', 'GLX'],
+       Same reason the car database lives in assets/cars.js: the website
+       loads that file directly with no PHP round trip, and this function
+       parses the very same bytes for the app. One file, two readers, so
+       a trim the site offers and a trim the app offers cannot drift apart.
 
-        // --- Honda ----------------------------------------------------
-        'Accord'            => ['LX', 'EX', 'EX-L', 'Sport', 'Touring'],
-        'Civic'             => ['LX', 'EX', 'Sport', 'Touring'],
-        'CR-V'              => ['LX', 'EX', 'EX-L', 'Touring'],
-        'Pilot'             => ['LX', 'EX', 'EX-L', 'Touring', 'Elite'],
+       The list was fetched from qatarsale.com with tools-win/fetch-trims.bat.
+       Nothing in it was written from memory. 497 of the 730 models in
+       cars.js have real trims; the rest have none on the source and get
+       «أخرى — اكتب الفئة» instead. A gap is left as a gap.
+       ------------------------------------------------------------------ */
+    $path = APP_ROOT . '/assets/trims.js';
+    $js   = @file_get_contents($path);
+    $byModel = [];
 
-        // --- Hyundai / Kia --------------------------------------------
-        'Sonata'            => ['GL', 'Smart', 'Comfort', 'Premium', 'N Line'],
-        'Elantra'           => ['GL', 'Smart', 'Comfort', 'Premium'],
-        'Tucson'            => ['GL', 'Smart', 'Comfort', 'Premium'],
-        'Santa Fe'          => ['GL', 'Comfort', 'Premium', 'Calligraphy'],
-        'Palisade'          => ['GL', 'Comfort', 'Premium', 'Calligraphy'],
-        'Sportage'          => ['LX', 'EX', 'GT-Line'],
-        'Sorento'           => ['LX', 'EX', 'SX', 'GT-Line'],
-        'Telluride'         => ['LX', 'EX', 'SX'],
-        'Cerato'            => ['LX', 'EX', 'GT-Line'],
+    if ($js === false) {
+        log_line('APPAPI: trims.js unreadable at ' . $path);
+    } else {
+        $start = strpos($js, '{', (int)strpos($js, 'CAR_TRIMS'));
+        $end   = strrpos($js, '}');
+        if ($start === false || $end === false || $end <= $start) {
+            log_line('APPAPI: trims.js did not parse — CAR_TRIMS assignment not found');
+        } else {
+            $parsed = json_decode(substr($js, $start, $end - $start + 1), true);
+            if (!is_array($parsed)) {
+                log_line('APPAPI: trims.js did not parse — ' . json_last_error_msg());
+            } else {
+                /* a stray non-list, or an empty one, is dropped rather than
+                   sent to a phone that would then draw an empty dropdown */
+                foreach ($parsed as $model => $list) {
+                    if (!is_array($list) || !$list) continue;
+                    $clean = [];
+                    foreach ($list as $trim) {
+                        $trim = trim((string)$trim);
+                        if ($trim !== '') $clean[] = $trim;
+                    }
+                    if ($clean) $byModel[(string)$model] = $clean;
+                }
+            }
+        }
+    }
 
-        // --- GM -------------------------------------------------------
-        'Tahoe'             => ['LS', 'LT', 'RST', 'Z71', 'Premier', 'High Country'],
-        'Suburban'          => ['LS', 'LT', 'RST', 'Z71', 'Premier', 'High Country'],
-        'Silverado'         => ['WT', 'Custom', 'LT', 'RST', 'LTZ', 'High Country'],
-        'Malibu'            => ['LS', 'LT', 'RS', 'Premier'],
-        'Yukon'             => ['SLE', 'SLT', 'AT4', 'Denali'],
-        'Yukon XL'          => ['SLE', 'SLT', 'AT4', 'Denali'],
-        'Sierra'            => ['SLE', 'SLT', 'AT4', 'Denali'],
-        'Escalade'          => ['Luxury', 'Premium Luxury', 'Sport', 'Platinum', 'V'],
-
-        // --- Ford / Jeep / RAM ----------------------------------------
-        'Expedition'        => ['XL', 'XLT', 'Limited', 'King Ranch', 'Platinum'],
-        'Explorer'          => ['XLT', 'Limited', 'ST', 'Platinum'],
-        'F-150'             => ['XL', 'XLT', 'Lariat', 'King Ranch', 'Platinum', 'Raptor'],
-        'Mustang'           => ['EcoBoost', 'GT', 'Mach 1', 'Shelby'],
-        'Wrangler'          => ['Sport', 'Sahara', 'Rubicon', 'Willys'],
-        'Grand Cherokee'    => ['Laredo', 'Limited', 'Overland', 'Summit', 'SRT', 'Trackhawk'],
-        '1500'              => ['Tradesman', 'Big Horn', 'Laramie', 'Rebel', 'Limited'],
-
-        // --- German ---------------------------------------------------
-        'G-Class'           => ['G 400 d', 'G 500', 'AMG G 63'],
-        'S-Class'           => ['S 450', 'S 500', 'S 580', 'AMG S 63', 'Maybach'],
-        'E-Class'           => ['E 200', 'E 300', 'E 450', 'AMG E 53'],
-        'C-Class'           => ['C 180', 'C 200', 'C 300', 'AMG C 43'],
-        'GLE'               => ['GLE 450', 'GLE 580', 'AMG GLE 53', 'AMG GLE 63'],
-        'GLS'               => ['GLS 450', 'GLS 580', 'AMG GLS 63', 'Maybach'],
-        'X5'                => ['xDrive40i', 'xDrive50e', 'M60i', 'X5 M'],
-        'X7'                => ['xDrive40i', 'M60i', 'Alpina XB7'],
-        '3 Series'          => ['320i', '330i', 'M340i', 'M3'],
-        '5 Series'          => ['520i', '530i', '540i', 'M5'],
-        '7 Series'          => ['735i', '740i', '760i', 'i7'],
-    ];
-
-    $byMake = [
-        'Toyota'        => ['GX', 'GXR', 'VX', 'VXR', 'TXL', 'EXR', 'GR Sport', 'SE', 'SR5', 'XLI', 'GLI', 'Limited', 'TRD'],
-        'Lexus'         => ['Standard', 'Prestige', 'Platinum', 'F Sport', 'Ultra Luxury'],
-        'Nissan'        => ['XE', 'SE', 'SV', 'SL', 'LE', 'Platinum', 'Nismo', 'Titanium'],
-        'Infiniti'      => ['Luxe', 'Essential', 'Sensory', 'Autograph', 'Sport'],
-        'Mitsubishi'    => ['GLX', 'GLS', 'Highline', 'Standard', 'Ralliart'],
-        'Honda'         => ['DX', 'LX', 'EX', 'EX-L', 'Sport', 'Touring', 'Type R'],
-        'Mazda'         => ['S', 'SV', 'Touring', 'Grand Touring', 'Signature'],
-        'Hyundai'       => ['GL', 'GLS', 'Smart', 'Comfort', 'Premium', 'Limited', 'Calligraphy', 'N Line'],
-        'Kia'           => ['LX', 'EX', 'SX', 'GT-Line', 'Base', 'Mid', 'Full'],
-        'Genesis'       => ['Premium', 'Luxury', 'Prestige', 'Sport'],
-        'Chevrolet'     => ['LS', 'LT', 'LTZ', 'RS', 'Premier', 'High Country', 'Z71', 'SS'],
-        'GMC'           => ['SLE', 'SLT', 'AT4', 'Denali', 'Elevation'],
-        'Cadillac'      => ['Luxury', 'Premium Luxury', 'Sport', 'Platinum', 'V'],
-        'Ford'          => ['XL', 'XLT', 'Lariat', 'King Ranch', 'Platinum', 'Titanium', 'ST', 'Raptor'],
-        'Lincoln'       => ['Standard', 'Reserve', 'Black Label'],
-        'Dodge'         => ['SXT', 'GT', 'R/T', 'SRT', 'Scat Pack', 'Hellcat'],
-        'RAM'           => ['Tradesman', 'Big Horn', 'Laramie', 'Limited', 'Rebel', 'TRX'],
-        'Chrysler'      => ['Touring', 'Limited', 'S'],
-        'Jeep'          => ['Sport', 'Sahara', 'Rubicon', 'Laredo', 'Limited', 'Overland', 'Summit', 'Trailhawk'],
-        'Mercedes-Benz' => ['Base', 'AMG Line', 'AMG', 'Maybach', '4MATIC', 'Night Package'],
-        'BMW'           => ['Base', 'Sport Line', 'Luxury Line', 'M Sport', 'M', 'xDrive'],
-    ];
+    /* No make-level fallback. A make-wide badge list built from this data
+       runs to 200-plus engine codes for BMW and mixes models from different
+       makes together, so it would offer the customer a worse answer than
+       «أخرى». Model trims where they are real, «أخرى» where they are not. */
+    $byMake = [];
 
     $makeOut = [];
     foreach ($byMake as $make => $list) $makeOut[$make] = array_map($badge, $list);
@@ -302,7 +255,9 @@ function app_trims(): array
         /* Model first, make second. No third level: an equipment grade we
            made up is not a trim, and there is no honest default. */
         'byModel' => $modelOut,
-        'byMake'  => $makeOut,
+        /* cast so an empty list still encodes as {} and not [] — a JSON
+           array where the app expects a map is a needless way to crash. */
+        'byMake'  => (object)$makeOut,
         'other'   => ['ar' => 'أخرى — اكتب الفئة', 'en' => 'Other — type it'],
     ];
 }
@@ -315,6 +270,8 @@ function app_trims(): array
 /*  same one — picked here, by the server, so a phone and a laptop in   */
 /*  the same room never show different cars.                            */
 /* ------------------------------------------------------------------ */
+const APP_CONCEPT_DIR = 'assets/concepts-app';
+
 function app_concept(): ?array
 {
     $file = APP_ROOT . '/concept.php';
@@ -322,13 +279,64 @@ function app_concept(): ?array
     require_once $file;
     if (!function_exists('concept_today')) return null;
 
-    $c = concept_today();
-    if (!is_array($c)) return null;
-
     $base = rtrim(base_url(), '/') . '/';
     $abs = function (?string $rel) use ($base): ?string {
-        return $rel === null ? null : $base . ltrim($rel, '/');
+        return $rel === null || $rel === '' ? null : $base . ltrim($rel, '/');
     };
+
+    /* ------------------------------------------------------------------
+       A phone is not a laptop turned sideways.
+
+       The website's pictures are wide studio shots, 1500 × 897. On a phone
+       held upright there is no way to show one of those without either
+       cropping the car in half or leaving bars down the screen. So the app
+       has its own pool of portrait pictures in assets/concepts-app/, shot
+       for the shape they are actually displayed in.
+
+       The rotation is the SAME slot number the website uses, so the two
+       change over together three times a day — different picture, same
+       moment. If the folder is missing the app simply falls back to the
+       website's pool and nothing breaks.
+       ------------------------------------------------------------------ */
+    $dir  = APP_ROOT . '/' . APP_CONCEPT_DIR;
+    $pool = [];
+    foreach (glob($dir . '/*.webp') ?: [] as $p) {
+        $n = basename($p, '.webp');
+        if (str_ends_with($n, '@sm')) continue;      // the small copies are not entries
+        $pool[] = $n;
+    }
+    sort($pool, SORT_NATURAL);
+
+    if ($pool) {
+        $slot = function_exists('concept_slot_number') ? concept_slot_number() : 0;
+        $name = $pool[$slot % count($pool)];
+
+        /* ?car=app3 — show one particular picture without waiting three days,
+           the same escape hatch the website has. */
+        $want = isset($_GET['car']) ? basename((string)$_GET['car']) : '';
+        if ($want !== '' && in_array($want, $pool, true)) $name = $want;
+
+        $v   = (int)@filemtime("$dir/$name.webp");
+        $size = @getimagesize("$dir/$name.webp");
+
+        return [
+            'name'     => $name,
+            'slot'     => $slot,
+            'image'    => $abs(APP_CONCEPT_DIR . "/$name.webp?v=$v"),
+            'image_sm' => is_file("$dir/$name@sm.webp")
+                ? $abs(APP_CONCEPT_DIR . "/$name@sm.webp?v=$v") : null,
+            'jpg'      => is_file("$dir/$name.jpg")
+                ? $abs(APP_CONCEPT_DIR . "/$name.jpg?v=$v") : null,
+            'width'    => $size ? (int)$size[0] : 1080,
+            'height'   => $size ? (int)$size[1] : 1935,
+            'portrait' => true,
+            'button'   => ['ar' => ct('splashBtn', 'ar'), 'en' => ct('splashBtn', 'en')],
+        ];
+    }
+
+    /* No app pool on the server yet — use the website's, as before. */
+    $c = concept_today();
+    if (!is_array($c)) return null;
 
     return [
         'name'   => (string)($c['name'] ?? ''),
@@ -340,6 +348,7 @@ function app_concept(): ?array
         'jpg'    => $abs($c['jpg'] ?? null),
         'width'  => (int)($c['w'] ?? 0),
         'height' => (int)($c['h'] ?? 0),
+        'portrait' => false,
         'button' => ['ar' => ct('splashBtn', 'ar'), 'en' => ct('splashBtn', 'en')],
     ];
 }
