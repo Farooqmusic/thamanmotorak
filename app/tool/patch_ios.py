@@ -21,6 +21,20 @@ It is also an automatic App Store rejection.
 
 Nothing about this is visible on Android, which is why it survived this long.
 
+AND THE SECOND THING, WHICH COST A BUILD
+----------------------------------------
+`flutter create` derives the iOS bundle identifier from the project name, so a
+freshly generated `ios/` says **com.thamanmotorak.thamanApp** — not the
+com.thamanmotorak.app that Android uses, that the App Store record was created
+with, and that the provisioning profile is issued for.
+
+`patch_android.py` has always corrected its side. Nothing corrected this one, so
+Xcode archived an app nobody had a profile for and the failure came back as
+"No valid code signing certificates were found" — which sends you hunting
+through certificates for an hour when the certificate was never the problem.
+
+The two ids have to match, and now they do.
+
 Run by tool/bootstrap.sh, straight after patch_android.py. Idempotent.
 """
 from __future__ import annotations
@@ -31,6 +45,12 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 PLIST = APP / "ios/Runner/Info.plist"
+PBXPROJ = APP / "ios/Runner.xcodeproj/project.pbxproj"
+
+# What `flutter create --org com.thamanmotorak --project-name thaman_app` writes
+# into the Xcode project. Android's generated name is different again
+# (com.thamanmotorak.thaman_app) — see patch_android.py.
+GENERATED = "com.thamanmotorak.thamanApp"
 
 # The name under the icon. Android says this too — see patch_android.py — and a
 # launcher that says one thing on one phone and something else on another makes
@@ -59,7 +79,43 @@ def die(msg: str) -> None:
     raise SystemExit(1)
 
 
+def fix_bundle_id(pkg: str) -> None:
+    """Make Xcode build the app the provisioning profile is actually for.
+
+    A blunt string replacement rather than a regex over PRODUCT_BUNDLE_IDENTIFIER,
+    because the same prefix also appears on the test target
+    (…thamanApp.RunnerTests) and replacing the prefix keeps that suffix intact
+    while a per-setting rewrite would flatten both to the same id — which Xcode
+    rejects.
+    """
+    if not PBXPROJ.exists():
+        die("ios/Runner.xcodeproj/project.pbxproj is missing")
+    s = PBXPROJ.read_text(encoding="utf-8")
+    if GENERATED not in s:
+        # Either Flutter changed how it derives the id, or someone already
+        # changed it by hand. Both are worth stopping for: guessing here is how
+        # you ship an app signed for the wrong identifier.
+        if pkg in s:
+            print(f"  bundle id already {pkg}")
+            return
+        die(f"neither {GENERATED} nor {pkg} is in project.pbxproj — "
+            "Flutter's template changed, look at it before building")
+    PBXPROJ.write_text(s.replace(GENERATED, pkg), encoding="utf-8")
+
+    left = [ln.strip() for ln in PBXPROJ.read_text(encoding="utf-8").splitlines()
+            if "PRODUCT_BUNDLE_IDENTIFIER" in ln]
+    if any(GENERATED in ln for ln in left):
+        die("some PRODUCT_BUNDLE_IDENTIFIER lines still carry the generated id")
+    print(f"  bundle id -> {pkg}")
+    for ln in sorted(set(left)):
+        print(f"    {ln}")
+
+
 def main() -> None:
+    pkg = sys.argv[1] if len(sys.argv) > 1 else "com.thamanmotorak.app"
+
+    fix_bundle_id(pkg)
+
     if not PLIST.exists():
         die("ios/Runner/Info.plist does not exist — run tool/bootstrap.sh first")
 
@@ -91,7 +147,7 @@ def main() -> None:
     if missing:
         die("these did not survive the write: " + ", ".join(missing))
 
-    print(f"patch_ios: ok — {DISPLAY_NAME}, "
+    print(f"patch_ios: ok — {pkg}, {DISPLAY_NAME}, "
           f"{len(PERMISSIONS)} usage descriptions, export compliance answered")
     for key in sorted(PERMISSIONS):
         print(f"  {key}")
