@@ -151,37 +151,37 @@ workflows:
           echo "--- the files that went into this build ---"
           find "$RES" -name 'tmk_*' -o -name 'styles.xml' | sort
           echo
-          echo "--- values-v31/styles.xml ---"
-          cat "$RES/values-v31/styles.xml"
-          echo
           echo "--- values/styles.xml ---"
           cat "$RES/values/styles.xml"
+          echo
+          echo "--- values-v31/styles.xml ---"
+          cat "$RES/values-v31/styles.xml"
 
-          # Hard checks. These are the four facts the launch screen depends on,
-          # and any one of them missing means the build is not worth installing.
-          for f in "$RES/values/styles.xml" "$RES/values-v31/styles.xml" \
-                   "$RES/drawable/tmk_launch_background.xml" \
-                   "$RES/drawable-xxxhdpi/tmk_splash_logo.png" \
+          # Hard checks. The splash itself is Flutter's now — what the native
+          # side must not get wrong is the window colour, and the one line that
+          # was wrong for four builds is NormalTheme's.
+          for f in "$RES/values/tmk_splash.xml" \
+                   "$RES/values/styles.xml" "$RES/values-night/styles.xml" \
+                   "$RES/values-v31/styles.xml" "$RES/values-night-v31/styles.xml" \
                    "$RES/drawable-xxxhdpi/tmk_splash_icon.png"; do
             [ -s "$f" ] || { echo "MISSING: $f"; exit 1; }
           done
-          grep -q 'tmk_launch_background' "$RES/values/styles.xml" \
-            || { echo "values/styles.xml does not reference the launch drawable"; exit 1; }
-          # NormalTheme is the one that actually shows during the hold — see
-          # tool/splash_android.py. Two matches means both themes carry it.
-          [ "$(grep -c 'tmk_launch_background' "$RES/values/styles.xml")" -ge 2 ] \
-            || { echo "NormalTheme is not branded — this is the bug we just fixed"; exit 1; }
+          # Two matches per file = LaunchTheme AND NormalTheme. One match means
+          # the white flash is back.
+          for f in "$RES/values/styles.xml" "$RES/values-night/styles.xml" \
+                   "$RES/values-v31/styles.xml" "$RES/values-night-v31/styles.xml"; do
+            [ "$(grep -c 'tmk_splash_bg' "$f")" -ge 2 ] \
+              || { echo "$f does not brand BOTH themes — white flash"; exit 1; }
+          done
           grep -q 'tmk_splash_icon' "$RES/values-v31/styles.xml" \
             || { echo "the Android 12 splash icon is not referenced"; exit 1; }
-          echo
-          echo "Launch screen: all five files present, both themes branded."
 
-          # Soft, for the record: what the packaged APK says about it.
-          echo "--- resource names found inside the APK ---"
-          APK=build/app/outputs/flutter-apk/app-release.apk
-          { unzip -p "$APK" resources.arsc | strings -a | grep -o 'tmk_[a-z_]*' ; \
-            unzip -p "$APK" resources.arsc | strings -a -el | grep -o 'tmk_[a-z_]*' ; } \
-            | sort -u || echo "(strings found none — the checks above are the ones that count)"
+          # And the artwork Flutter animates has to be in the bundle.
+          unzip -l build/app/outputs/flutter-apk/app-release.apk \
+            | grep 'assets/brand/splash-mark.png' \
+            || { echo "splash-mark.png is not in the APK"; exit 1; }
+          echo
+          echo "Launch screen: window branded in all four themes, mark bundled."
 
       - name: Build App Bundle
         script: |
