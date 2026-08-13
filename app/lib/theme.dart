@@ -171,12 +171,34 @@ ThemeData buildTheme({required bool dark, required bool arabic}) {
       errorBorder: border(Brand.red),
       focusedErrorBorder: border(Brand.red, 1.8),
       labelStyle: textTheme.bodyMedium?.copyWith(color: muted),
-      floatingLabelStyle: TextStyle(
-        fontFamily: f.family,
-        fontFamilyFallback: f.fallback,
-        color: dark ? Brand.dBrandInk : Brand.brand,
-        fontWeight: FontWeight.w700,
-      ),
+
+      /// The name of the field, once it has floated above the box.
+      ///
+      /// It used to be the brand pink on every field all of the time. Pink on
+      /// a near-black screen at label size is a colour you can see but not
+      /// comfortably read, and eight of them stacked down a form read as
+      /// decoration rather than as the questions being asked.
+      ///
+      /// Now the label is simply the text colour — white on dark, near-black
+      /// on light — at a size that can be read at arm's length, and it turns
+      /// brand pink only on the field the customer is actually in. The colour
+      /// went from being everywhere, meaning nothing, to marking one thing.
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+        final focused = states.contains(WidgetState.focused);
+        final errored = states.contains(WidgetState.error);
+        return TextStyle(
+          fontFamily: f.family,
+          fontFamilyFallback: f.fallback,
+          fontSize: f.size(14),
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+          color: errored
+              ? Brand.red
+              : focused
+                  ? (dark ? Brand.dBrandInk : Brand.brand)
+                  : ink,
+        );
+      }),
       hintStyle: textTheme.bodyMedium?.copyWith(color: muted),
       // Typed answers should look more solid than the labels around them.
       // 16 px is also the size below which iOS zooms the page on focus.
