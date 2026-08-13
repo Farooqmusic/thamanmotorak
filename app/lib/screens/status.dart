@@ -176,7 +176,7 @@ class _Result extends StatelessWidget {
         // The traffic light the website uses: red while under review, green
         // when the price is in. It is understood before anything is read.
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: colour.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(16),
@@ -192,11 +192,25 @@ class _Result extends StatelessWidget {
                   children: [
                     Text(
                       done ? t('ready') : t('underReview'),
-                      style: theme.textTheme.titleMedium?.copyWith(color: colour),
+                      style: theme.textTheme.titleMedium?.copyWith(color: colour, height: 1.25),
                     ),
-                    const SizedBox(height: 3),
-                    Text(done ? t('readySub') : t('underReviewSub'),
-                        style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 2),
+                    // One line, whatever it takes.
+                    //
+                    // «طلبك وصل. سنرسل السعر على بريدك فور جاهزيته.» wrapped
+                    // onto two lines and made the card twice as tall as the
+                    // thing it is telling you. The sentence is Khalid's, so it
+                    // is not ours to shorten — the type shrinks to fit instead.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        done ? t('readySub') : t('underReviewSub'),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: theme.textTheme.bodySmall?.copyWith(height: 1.3),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -269,20 +283,33 @@ class _Result extends StatelessWidget {
     );
   }
 
+  /// One fact per row, label on one side and answer on the other.
+  ///
+  /// Body copy carries Arabic's line height of 1.85 — right for a paragraph,
+  /// far too airy for a five-row table, where it left a finger's width of
+  /// nothing between every line. These rows set their own height and their own
+  /// padding, so the card is a table rather than an essay.
   Widget _row(BuildContext context, String k, String v) {
     if (v.trim().isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             flex: 2,
-            child: Text(k, style: Theme.of(context).textTheme.bodySmall),
+            child: Text(k, style: theme.textTheme.bodySmall?.copyWith(height: 1.3)),
           ),
           Expanded(
             flex: 3,
-            child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              v,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
           ),
         ],
       ),
