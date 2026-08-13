@@ -36,33 +36,50 @@ class InfoScreen extends StatelessWidget {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
 
+    // Nothing on this tab has been removed — it is the same four cards with
+    // the same words. What changed is how much of the screen they take before
+    // the customer has asked for any of it: the two long paragraphs open
+    // folded to four lines with a «المزيد» underneath, the guide card is one
+    // tappable row instead of a heading, a sentence and a full-width button,
+    // and the padding and the gaps are a couple of pixels tighter throughout.
+    // Together that is roughly a screen and a half down to under one.
+    const cardPad = EdgeInsets.fromLTRB(14, 14, 14, 12);
+    const gap = SizedBox(height: 10);
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       children: [
         if (t('overviewBody').trim().isNotEmpty) ...[
           SectionCard(
+            padding: cardPad,
             title: t('overviewTitle'),
-            child: Text(t('overviewBody'), style: theme.textTheme.bodyMedium),
+            child: _Folded(text: t('overviewBody'), lines: 4, lang: lang),
           ),
-          const SizedBox(height: 14),
+          gap,
         ],
 
-        SectionCard(
-          title: t('guideTitle'),
-          subtitle: t('guideSub'),
-          child: OutlinedButton.icon(
-            onPressed: () => open(config.page('guide')),
-            icon: const Icon(Icons.menu_book_outlined),
-            label: Text(t('guideTitle')),
+        // One row, the same shape as the contact rows below it. It was a
+        // heading, a sentence and a full-width button — three stacked things
+        // to say "tap here to read the guide".
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            leading: const Icon(Icons.menu_book_outlined),
+            title: Text(t('guideTitle'), style: theme.textTheme.titleSmall),
+            subtitle: Text(t('guideSub'), style: theme.textTheme.bodySmall),
+            trailing: const Icon(Icons.open_in_new, size: 17),
+            onTap: () => open(config.page('guide')),
           ),
         ),
-        const SizedBox(height: 14),
+        gap,
 
         SectionCard(
+          padding: cardPad,
           title: t('privTitle'),
-          child: Text(t('privBody'), style: theme.textTheme.bodyMedium),
+          child: _Folded(text: t('privBody'), lines: 4, lang: lang),
         ),
-        const SizedBox(height: 14),
+        gap,
 
         // Only what the control panel actually holds, in the order it holds
         // it. A field Khalid clears disappears here too — the same rule the
@@ -70,13 +87,17 @@ class InfoScreen extends StatelessWidget {
         // everywhere.
         if (contact.isNotEmpty) ...[
           SectionCard(
+            padding: cardPad,
             title: t('cTitle'),
             child: Column(
               children: [
                 for (final c in contact)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(_iconFor(c.kind)),
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    minLeadingWidth: 28,
+                    leading: Icon(_iconFor(c.kind), size: 21),
                     // One line, on any phone. An address is a link — nobody
                     // reads it, they tap it — so shrinking it to fit beats
                     // wrapping "contact@thamanmotorak.c / om" across two lines.
@@ -107,7 +128,7 @@ class InfoScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          gap,
         ],
 
         Row(
@@ -191,5 +212,83 @@ class InfoScreen extends StatelessWidget {
       default:
         return Icons.link;
     }
+  }
+}
+
+/// A paragraph that opens folded, with a way to unfold it.
+///
+/// The two long blocks on this tab — what the service is, and what happens to
+/// your photographs — are worth reading once and worth almost nothing on the
+/// ninety-ninth visit, and between them they filled the screen before there
+/// was anything on it to tap. Four lines each now, and «المزيد» for the rest.
+///
+/// The toggle only appears when the text really is longer than four lines. A
+/// "more" that opens nothing is worse than no "more" at all, so this measures
+/// the actual words at the actual width, in whatever type size the owner of
+/// the phone has chosen, instead of guessing from the number of characters.
+class _Folded extends StatefulWidget {
+  const _Folded({required this.text, required this.lines, required this.lang});
+
+  final String text;
+  final int lines;
+  final String lang;
+
+  @override
+  State<_Folded> createState() => _FoldedState();
+}
+
+class _FoldedState extends State<_Folded> {
+  bool open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodyMedium;
+    final ar = widget.lang == 'ar';
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: widget.lines,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: box.maxWidth);
+        final longer = painter.didExceedMaxLines;
+        painter.dispose();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.text,
+              style: style,
+              maxLines: open || !longer ? null : widget.lines,
+              overflow: open || !longer
+                  ? TextOverflow.clip
+                  : TextOverflow.ellipsis,
+            ),
+            if (longer)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  onPressed: () => setState(() => open = !open),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: theme.textTheme.bodySmall,
+                  ),
+                  child: Text(
+                    open
+                        ? (ar ? 'أقل' : 'Less')
+                        : (ar ? 'المزيد' : 'More'),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }

@@ -121,8 +121,14 @@ class _WizardScreenState extends State<WizardScreen> {
   String? _validate(int s) {
     switch (s) {
       case 0:
-        if (d.make.isEmpty || d.carClass.isEmpty || d.year.isEmpty) return t('errFields');
+        // Tested in the order the questions are asked, and in the same order
+        // as `_StepCarState._firstMissing`. The two used to disagree: the walk
+        // would stop on the empty trim and the red box would say "fill in the
+        // make, class, model, year and mileage", which points at five fields
+        // to explain one.
+        if (d.make.isEmpty || d.carClass.isEmpty) return t('errFields');
         if (d.model.trim().isEmpty) return t('errModel');
+        if (d.year.isEmpty) return t('errFields');
         if (d.mileage.replaceAll(RegExp(r'[^0-9]'), '').isEmpty) return t('errKm');
         return null;
       case 1:
@@ -374,22 +380,58 @@ class _StepCarState extends State<_StepCar> {
     if (i > _cursor) _cursor = i;
   }
 
+  /// The first question on this page that has to be answered and has not been,
+  /// or null when all five compulsory answers are there.
+  ///
+  /// The indexes are the same seven stops as `_keys`: make · class · trim ·
+  /// year · mileage · registration · chassis. The last two are optional and
+  /// say so on the field itself, so they are never in this list.
+  int? _firstMissing() {
+    final d = widget.d;
+    if (d.make.isEmpty) return 0;
+    if (d.carClass.isEmpty) return 1;
+    if (d.model.trim().isEmpty) return 2;
+    if (d.year.isEmpty) return 3;
+    if (d.mileage.replaceAll(RegExp(r'[^0-9]'), '').isEmpty) return 4;
+    return null;
+  }
+
   /// True when it moved somewhere on this page; false when the page has been
   /// walked to the end and «التالي» should mean "the next step".
+  ///
+  /// **«التالي» will not step over a compulsory answer that is still empty.**
+  /// Farooq: *"after make and class, trim and mileage should be compulsory,
+  /// user must fill it"*. The walk was carrying people down to the two optional
+  /// boxes at the bottom with the trim and the mileage still blank, and a
+  /// valuation with no trim and no reading is one nobody can actually price.
+  ///
+  /// So when the walk meets an unanswered compulsory field it stops on it and
+  /// returns false — which hands the press back to `_next`, whose `_validate`
+  /// then names what is missing in the red box. The rest of the page stays
+  /// reachable the moment that field is answered.
   bool advance() {
+    final missing = _firstMissing();
+    if (missing != null && missing <= _cursor) {
+      _cursor = missing;
+      _scrollTo(missing);
+      return false;
+    }
     if (_cursor >= _stops - 1) return false;
     _cursor++;
-    final ctx = _keys[_cursor].currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOut,
-        alignment: 0.2,
-      );
-    }
+    _scrollTo(_cursor);
     _nodes[_cursor].requestFocus();
     return true;
+  }
+
+  void _scrollTo(int i) {
+    final ctx = _keys[i].currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOut,
+      alignment: 0.2,
+    );
   }
 
   @override
@@ -407,7 +449,7 @@ class _StepCarState extends State<_StepCar> {
         : cfg.yearsOf(d.make, d.carClass);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         ErrorBox(message: error),
 
@@ -457,7 +499,18 @@ class _StepCarState extends State<_StepCar> {
         // opening the box so nothing a seller owns is impossible to describe.
         KeyedSubtree(
           key: _keys[2],
-          child: _TrimField(cfg: cfg, d: d, lang: lang, onTouched: () => _seen(2)),
+          // Keyed on the car, so that changing the make or the class throws the
+          // whole field away and builds a fresh one. Without that, «أخرى» stays
+          // switched on across a change of make and the customer is looking at
+          // a free-text box belonging to a car he is no longer selling.
+          child: _TrimField(
+            key: ValueKey('trim:${d.make}|${d.carClass}'),
+            cfg: cfg,
+            d: d,
+            lang: lang,
+            focusNode: _nodes[2],
+            onTouched: () => _seen(2),
+          ),
         ),
         const SizedBox(height: 14),
 
@@ -518,15 +571,18 @@ class _StepCarState extends State<_StepCar> {
 /// as it always did.
 class _TrimField extends StatefulWidget {
   const _TrimField({
+    super.key,
     required this.cfg,
     required this.d,
     required this.lang,
+    this.focusNode,
     this.onTouched,
   });
 
   final AppConfig cfg;
   final Draft d;
   final String lang;
+  final FocusNode? focusNode;
 
   /// Answering this counts as having been through it — see `_StepCarState`.
   final VoidCallback? onTouched;
@@ -594,25 +650,36 @@ class _TrimFieldState extends State<_TrimField> {
         ? _otherKey
         : (cfg.isKnownTrim(d.model, d.make, d.carClass) ? d.model : null);
 
+    // Locked until there is a car to have trims, exactly as «الفئة» is locked
+    // until there is a make. It used to be the one box on the page you could
+    // open before answering anything, which made it look optional next to a
+    // greyed-out neighbour — and it is not optional at all.
+    final ready = d.make.isNotEmpty && d.carClass.isNotEmpty;
+
     return Column(
       children: [
         DropdownButtonFormField<String>(
           value: selected,
           isExpanded: true,
+          focusNode: widget.focusNode,
           decoration: InputDecoration(labelText: cfg.t('fModel', lang)),
           hint: Text(
-            lang == 'ar' ? '— اختر الفئة —' : '— select trim —',
+            lang == 'ar'
+                ? (ready ? '— اختر الفئة الفرعية —' : '— اختر الشركة والفئة أولاً —')
+                : (ready ? '— Select trim —' : '— Choose make and class first —'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           items: items,
-          onChanged: (v) {
-            if (v == null) return;
-            widget.onTouched?.call();
-            setState(() {
-              other = v == _otherKey;
-              d.set(() => d.model = other ? '' : v);
-            });
-          },
+          onChanged: !ready
+              ? null
+              : (v) {
+                  if (v == null) return;
+                  widget.onTouched?.call();
+                  setState(() {
+                    other = v == _otherKey;
+                    d.set(() => d.model = other ? '' : v);
+                  });
+                },
         ),
         if (other) ...[
           const SizedBox(height: 10),
@@ -694,7 +761,7 @@ class _StepConditionState extends State<_StepCondition> {
 
     return ListView(
       controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         ErrorBox(message: error),
 
@@ -975,7 +1042,7 @@ class _StepPhotosState extends State<_StepPhotos> {
     return Stack(
       children: [
         ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             ErrorBox(message: widget.error),
 
@@ -1225,7 +1292,7 @@ class _StepContact extends StatelessWidget {
     String t(String k) => cfg.t(k, lang);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         ErrorBox(message: error),
 
@@ -1293,6 +1360,28 @@ class _Field extends StatefulWidget {
 
 class _FieldState extends State<_Field> {
   late final TextEditingController c = TextEditingController(text: widget.value);
+
+  /// Keep the box showing what the draft actually holds.
+  ///
+  /// The controller used to be filled once and never looked at again, so a
+  /// field the *app* cleared went on displaying the old answer. Changing the
+  /// make clears the trim, and the «أخرى» box would sit there still reading
+  /// "GXR" while the draft held nothing — harmless until «التالي» started
+  /// refusing to move past an empty trim, at which point it becomes a customer
+  /// being told to fill in a box he can plainly see is filled in.
+  ///
+  /// It cannot fight the keyboard: while he is typing, `widget.value` and
+  /// `c.text` are the same string, so this does nothing.
+  @override
+  void didUpdateWidget(_Field old) {
+    super.didUpdateWidget(old);
+    if (widget.value != old.value && widget.value != c.text) {
+      c.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
 
   @override
   void dispose() {

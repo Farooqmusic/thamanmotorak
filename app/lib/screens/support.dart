@@ -138,77 +138,93 @@ class _SupportScreenState extends State<SupportScreen> {
 
     final kinds = widget.config.supportKinds;
 
+    String kindLabel(String k) {
+      final v = kinds[k];
+      if (v is Map) return '${v[lang] ?? v['en'] ?? k}';
+      return '$v';
+    }
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
         Text(t('supportTitle'), style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(t('supportIntro'), style: theme.textTheme.bodySmall),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
 
         ErrorBox(message: error),
 
-        SectionCard(
-          title: t('supKind'),
-          child: ChoiceChips(
-            options: kinds.keys.toList(),
-            labelOf: (k) {
-              final v = kinds[k];
-              if (v is Map) return '${v[lang] ?? v['en'] ?? k}';
-              return '$v';
-            },
-            value: kind,
-            onChanged: (v) => setState(() => kind = v ?? 'problem'),
-          ),
+        // «نوع الرسالة» was a titled card holding three full-width buttons —
+        // about a fifth of the screen spent on a question with three answers,
+        // and it pushed the message box, which is the actual point of the
+        // page, below the fold. One line does the same job.
+        DropdownButtonFormField<String>(
+          value: kinds.containsKey(kind) ? kind : null,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: t('supKind')),
+          items: [
+            for (final k in kinds.keys)
+              DropdownMenuItem(
+                value: k,
+                child: Text(kindLabel(k), overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (v) => setState(() => kind = v ?? kind),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
+        // Starts two lines tall and grows as it is typed into, up to eight.
+        // A box that is five lines of empty grey before anybody has written a
+        // word is five lines of nothing; one that grows shows the customer
+        // that what he is writing is being kept.
         TextField(
           controller: _msg,
-          maxLines: 5,
+          minLines: 2,
+          maxLines: 8,
+          keyboardType: TextInputType.multiline,
           decoration: InputDecoration(
             labelText: t('supMsg'),
             hintText: t('supMsgPh'),
             alignLabelWithHint: true,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
         Text(t('supReach'), style: theme.textTheme.bodySmall),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
 
         TextField(controller: _name, decoration: InputDecoration(labelText: t('fName'))),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(labelText: t('fEmail')),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         TextField(
           controller: _phone,
           keyboardType: TextInputType.phone,
           decoration: InputDecoration(labelText: t('fPhone')),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         TextField(
           controller: _ref,
           textCapitalization: TextCapitalization.characters,
           decoration: InputDecoration(labelText: t('supRef')),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
         FilledButton(
           onPressed: busy ? null : _send,
           child: Text(busy ? t('supSending') : t('supSend')),
         ),
 
-        const SizedBox(height: 30),
+        const SizedBox(height: 22),
         Divider(color: theme.dividerTheme.color),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
 
         Text(t('supFollowT'), style: theme.textTheme.titleMedium),
-        const SizedBox(height: 5),
+        const SizedBox(height: 4),
         Text(t('supFollowS'), style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
 
