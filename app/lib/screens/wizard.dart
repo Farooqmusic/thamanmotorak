@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -175,6 +176,7 @@ class _WizardScreenState extends State<WizardScreen> {
         fields: d.toFields(lang),
         photos: d.photoFiles,
         videos: d.videoFiles,
+        reports: d.reportFiles,
         onProgress: (sent, total) {
           if (!mounted || total <= 0) return;
           setState(() => progress = sent / total);
@@ -246,6 +248,12 @@ class _WizardScreenState extends State<WizardScreen> {
         return cfg.f('errBig', lang, {'f': '', 'n': cfg.maxVideoMB});
       case 'video_count':
         return cfg.f('errVideoMax', lang, {'n': cfg.maxVideos});
+      case 'report_type':
+        return t('errReportType');
+      case 'report_big':
+        return cfg.f('errBig', lang, {'f': '', 'n': cfg.maxReportMB});
+      case 'report_count':
+        return cfg.f('errReportMax', lang, {'n': cfg.maxReports});
       default:
         return t('errNet');
     }
@@ -412,7 +420,11 @@ class _StepCarState extends State<_StepCar> {
   bool advance() {
     final missing = _firstMissing();
     if (missing != null && missing <= _cursor) {
-      _cursor = missing;
+      // Scroll to it, but do NOT move the cursor back to it. Lowering the
+      // cursor punishes the customer for correcting himself: someone who had
+      // filled all seven boxes, went back and cleared the trim, would be sent
+      // to stop three and then have to press «التالي» four more times to leave
+      // a page that is completely filled in.
       _scrollTo(missing);
       return false;
     }
@@ -1003,6 +1015,115 @@ class _StepPhotosState extends State<_StepPhotos> {
     }
   }
 
+
+  /// What the file picker will offer.
+  ///
+  /// All three lists are given because each platform reads a different one:
+  /// Android and the web read `mimeTypes`, Apple reads the uniform type
+  /// identifiers, and `extensions` is the fallback. Naming all three is how
+  /// one call behaves the same everywhere; it is what the plugin's own
+  /// documentation does, and neither platform rejects the others.
+  static const _reportTypes = XTypeGroup(
+    label: 'report',
+    extensions: <String>['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'],
+    mimeTypes: <String>['application/pdf', 'image/*'],
+    uniformTypeIdentifiers: <String>['com.adobe.pdf', 'public.image'],
+  );
+
+  /// The inspection report, from the phone's files.
+  ///
+  /// A second plugin rather than more `image_picker`, and this is the only
+  /// place in the app that needs it: `image_picker` cannot open a PDF, and a
+  /// «فحص» report is a PDF at least as often as it is a photograph. Two
+  /// buttons rather than one so the choice is visible — «ملف» for the PDF the
+  /// garage emailed him, «كاميرا» for the paper on his dashboard — which is
+  /// the same pair of words the photo slots above already use.
+  Future<void> _pickReportFile() async {
+    if (!_reportRoom()) return;
+    setState(() => busy = true);
+    try {
+      final picked =
+          await openFiles(acceptedTypeGroups: const <XTypeGroup>[_reportTypes]);
+      for (final x in picked) {
+        if (!_reportRoom()) break;
+        // Android copies the chosen document into the app's cache under its
+        // display name, so picking the same file twice returns the same path
+        // twice — two identical tiles, both slots gone, and the same bytes
+        // sent twice over a mobile connection.
+        if (d.reportPaths.contains(x.path)) continue;
+        if (!_reportTypeOk(x.name)) {
+          _say(t('errReportType'));
+          continue;
+        }
+        if (!await _reportSizeOk(x.path, x.name)) continue;
+        d.set(() => d.reportPaths.add(x.path));
+      }
+    } on Object {
+      _say(t('errNet'));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  /// A photograph of the report, taken there and then.
+  ///
+  /// Deliberately larger than the car photographs — 2600 px at quality 88
+  /// rather than 2000 at 82. A scratch is still a scratch at any size, but a
+  /// chassis number on a printed sheet stops being readable, and an inspection
+  /// report nobody can read is worse than none at all.
+  Future<void> _pickReportPhoto() async {
+    if (!_reportRoom()) return;
+    setState(() => busy = true);
+    try {
+      final x = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 2600,
+        maxHeight: 2600,
+        imageQuality: 88,
+      );
+      if (x == null) return;
+      if (d.reportPaths.contains(x.path)) return;
+      if (!await _reportSizeOk(x.path, x.name)) return;
+      d.set(() => d.reportPaths.add(x.path));
+    } on PlatformException catch (e) {
+      _say(e.message ?? t('errNet'));
+    } on Object {
+      _say(t('errNet'));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  bool _reportRoom() {
+    if (d.reportPaths.length < cfg.maxReports) return true;
+    _say(cfg.f('errReportMax', lang, {'n': cfg.maxReports}));
+    return false;
+  }
+
+  /// The same list `api.php` will accept, checked here so a file that was
+  /// never going to be allowed is refused before several megabytes of it go up
+  /// a mobile connection rather than after.
+  ///
+  /// A name with **no** extension passes. Android's document providers do not
+  /// always supply one — a HEIC whose MIME type the phone cannot map, or a
+  /// provider that returns no display name at all, arrives as a bare
+  /// `file_selector`. Refusing those would show «التقرير يجب أن يكون PDF أو
+  /// صورة» for a file the PDF-filtered picker had just handed him, with no way
+  /// forward. Where we cannot tell, the server decides.
+  bool _reportTypeOk(String name) {
+    final dot = name.lastIndexOf('.');
+    if (dot < 0 || dot == name.length - 1) return true;
+    return RegExp(r'^(pdf|jpe?g|png|webp|heic|heif)$', caseSensitive: false)
+        .hasMatch(name.substring(dot + 1));
+  }
+
+  Future<bool> _reportSizeOk(String path, String name) async {
+    final size = await File(path).length();
+    if (size <= cfg.maxReportMB * 1024 * 1024) return true;
+    _say(cfg.f('errBig', lang, {'f': name, 'n': cfg.maxReportMB}));
+    return false;
+  }
+
   Future<void> _pickVideo() async {
     if (d.videoPaths.length >= cfg.maxVideos) {
       _say(cfg.f('errVideoMax', lang, {'n': cfg.maxVideos}));
@@ -1143,6 +1264,62 @@ class _StepPhotosState extends State<_StepPhotos> {
                 ],
               ),
             ),
+            if (cfg.supportsReports) ...[
+              const SizedBox(height: 14),
+
+              // Last on the page on purpose, under the video. It is the one
+              // thing here most sellers will not have, and a box most people
+              // must skip belongs at the bottom — but the few who do have one
+              // are handing over the most persuasive document about their car,
+              // so it is worth asking every time.
+              SectionCard(
+                title: t('addReport'),
+                subtitle: t('reportRule'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < d.reportPaths.length; i++)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          d.reportPaths[i].toLowerCase().endsWith('.pdf')
+                              ? Icons.picture_as_pdf_outlined
+                              : Icons.description_outlined,
+                        ),
+                        title: Text(
+                          d.reportPaths[i].split(Platform.pathSeparator).last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => d.set(() => d.reportPaths.removeAt(i)),
+                        ),
+                      ),
+                    if (d.reportPaths.length < cfg.maxReports)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickReportFile,
+                              icon: const Icon(Icons.attach_file),
+                              label: Text(t('reportFile')),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickReportPhoto,
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(t('reportCamera')),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
         if (busy)
