@@ -36,6 +36,14 @@ definitions:
       # folders exist (it writes into them). Both are true by the time this runs.
       script: cd app && dart run flutter_launcher_icons
 
+    - &splash
+      name: Launch screen
+      # Same two conditions as the icons: after `pub get`, because it is a pub
+      # package, and after the platform folders exist, because it writes the
+      # drawables and the Android 12 style into them. Skipping this is what
+      # left a white rectangle between the icon and the app.
+      script: cd app && dart run flutter_native_splash:create
+
     - &analyze
       name: Analyse
       # Forty seconds here saves a six-minute build that was going to
@@ -99,6 +107,7 @@ workflows:
 
       - *pub_get
       - *icons
+      - *splash
       - *analyze
       - *test
 
@@ -186,6 +195,7 @@ workflows:
       - *generate_platform_folders
       - *pub_get
       - *icons
+      - *splash
       - *analyze
       - *test
 
