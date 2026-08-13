@@ -38,6 +38,11 @@ class WizardScreen extends StatefulWidget {
 
 class _WizardScreenState extends State<WizardScreen> {
   final _page = PageController();
+
+  /// The first two steps know how to walk themselves — see `_next`.
+  final _carStep = GlobalKey<_StepCarState>();
+  final _conditionStep = GlobalKey<_StepConditionState>();
+
   int step = 0;
   String error = '';
 
@@ -78,7 +83,26 @@ class _WizardScreenState extends State<WizardScreen> {
     _page.animateToPage(to, duration: const Duration(milliseconds: 260), curve: Curves.easeOut);
   }
 
+  /// «التالي» does two different jobs, and which one it does depends on how
+  /// far down the page the customer has actually got.
+  ///
+  /// On the first two steps it walks the page first: one press moves to the
+  /// next field, or scrolls the next question into view. Only once the step
+  /// has been gone through end to end does the same button start meaning
+  /// "leave this screen".
+  ///
+  /// Before this, someone could stand on the very first field, press the big
+  /// button, and land on the photographs — رقم الاستمارة and رقم الشاصي and
+  /// the three condition scales below the fold were never even seen. They are
+  /// optional, which is exactly the problem: an optional question nobody
+  /// scrolls to is a question nobody ever answers.
+  ///
+  /// Answering a field directly counts as having been through it, so filling
+  /// the form top to bottom by hand does not then cost seven presses to leave.
   void _next() {
+    if (step == 0 && _carStep.currentState?.advance() == true) return;
+    if (step == 1 && _conditionStep.currentState?.advance() == true) return;
+
     final problem = _validate(step);
     if (problem != null) {
       setState(() => error = problem);
@@ -253,8 +277,8 @@ class _WizardScreenState extends State<WizardScreen> {
                 controller: _page,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _StepCar(cfg: cfg, d: d, lang: lang, error: error),
-                  _StepCondition(cfg: cfg, d: d, lang: lang, error: error),
+                  _StepCar(key: _carStep, cfg: cfg, d: d, lang: lang, error: error),
+                  _StepCondition(key: _conditionStep, cfg: cfg, d: d, lang: lang, error: error),
                   _StepPhotos(cfg: cfg, d: d, lang: lang, error: error),
                   _StepContact(cfg: cfg, d: d, lang: lang, error: error),
                 ],
@@ -295,18 +319,85 @@ class _WizardScreenState extends State<WizardScreen> {
 
 // ============================================================ step 1 — car
 
-class _StepCar extends StatelessWidget {
-  const _StepCar({required this.cfg, required this.d, required this.lang, required this.error});
+class _StepCar extends StatefulWidget {
+  const _StepCar({
+    super.key,
+    required this.cfg,
+    required this.d,
+    required this.lang,
+    required this.error,
+  });
 
   final AppConfig cfg;
   final Draft d;
   final String lang;
   final String error;
 
+  @override
+  State<_StepCar> createState() => _StepCarState();
+}
+
+class _StepCarState extends State<_StepCar> {
   static const _other = '__other__';
+
+  /// One stop per answer on this page, in the order the eye reads them:
+  /// make · class · trim · year · mileage · registration · chassis.
+  static const _stops = 7;
+
+  final List<GlobalKey> _keys = List.generate(_stops, (_) => GlobalKey());
+  final List<FocusNode> _nodes = List.generate(_stops, (_) => FocusNode());
+
+  /// How far down the page the customer has actually been.
+  int _cursor = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    for (var i = 0; i < _stops; i++) {
+      _nodes[i].addListener(() {
+        if (_nodes[i].hasFocus) _seen(i);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final n in _nodes) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Touching a field counts as having been through it — and everything above
+  /// it, since you cannot reach the fifth box without passing the fourth.
+  void _seen(int i) {
+    if (i > _cursor) _cursor = i;
+  }
+
+  /// True when it moved somewhere on this page; false when the page has been
+  /// walked to the end and «التالي» should mean "the next step".
+  bool advance() {
+    if (_cursor >= _stops - 1) return false;
+    _cursor++;
+    final ctx = _keys[_cursor].currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+        alignment: 0.2,
+      );
+    }
+    _nodes[_cursor].requestFocus();
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cfg = widget.cfg;
+    final d = widget.d;
+    final lang = widget.lang;
+    final error = widget.error;
     String t(String k) => cfg.t(k, lang);
 
     final makes = cfg.makes;
@@ -321,32 +412,42 @@ class _StepCar extends StatelessWidget {
         ErrorBox(message: error),
 
         _Dropdown(
+          key: _keys[0],
+          focusNode: _nodes[0],
           label: t('fMake'),
           hint: t('selMake'),
           value: makes.contains(d.make) ? d.make : null,
           items: makes,
-          onChanged: (v) => d.set(() {
-            d.make = v ?? '';
-            d.carClass = '';
-            d.year = '';
-            // Another make means another vocabulary of trims.
-            d.model = '';
-          }),
+          onChanged: (v) {
+            _seen(0);
+            d.set(() {
+              d.make = v ?? '';
+              d.carClass = '';
+              d.year = '';
+              // Another make means another vocabulary of trims.
+              d.model = '';
+            });
+          },
         ),
         const SizedBox(height: 14),
 
         _Dropdown(
+          key: _keys[1],
+          focusNode: _nodes[1],
           label: t('fClass'),
           hint: t('selClass'),
           value: classes.contains(d.carClass) ? d.carClass : null,
           items: classes,
           enabled: classes.isNotEmpty,
-          onChanged: (v) => d.set(() {
-            d.carClass = v ?? '';
-            d.year = '';
-            // A Camry trim means nothing on a Land Cruiser.
-            d.model = '';
-          }),
+          onChanged: (v) {
+            _seen(1);
+            d.set(() {
+              d.carClass = v ?? '';
+              d.year = '';
+              // A Camry trim means nothing on a Land Cruiser.
+              d.model = '';
+            });
+          },
         ),
         const SizedBox(height: 14),
 
@@ -354,19 +455,29 @@ class _StepCar extends StatelessWidget {
         // is where data goes to die: GXR, gxr and "full option gxr" are one
         // car and three answers. A list now, in two groups, with «أخرى» still
         // opening the box so nothing a seller owns is impossible to describe.
-        _TrimField(cfg: cfg, d: d, lang: lang),
+        KeyedSubtree(
+          key: _keys[2],
+          child: _TrimField(cfg: cfg, d: d, lang: lang, onTouched: () => _seen(2)),
+        ),
         const SizedBox(height: 14),
 
         _Dropdown(
+          key: _keys[3],
+          focusNode: _nodes[3],
           label: t('fYear'),
           hint: t('selYear'),
           value: years.map((e) => '$e').contains(d.year) ? d.year : null,
           items: years.map((e) => '$e').toList(),
-          onChanged: (v) => d.set(() => d.year = v ?? ''),
+          onChanged: (v) {
+            _seen(3);
+            d.set(() => d.year = v ?? '');
+          },
         ),
         const SizedBox(height: 14),
 
         _Field(
+          key: _keys[4],
+          focusNode: _nodes[4],
           label: t('fKm'),
           value: d.mileage,
           keyboard: TextInputType.number,
@@ -377,6 +488,8 @@ class _StepCar extends StatelessWidget {
         const SizedBox(height: 14),
 
         _Field(
+          key: _keys[5],
+          focusNode: _nodes[5],
           label: t('fReg'),
           value: d.registration,
           onChanged: (v) => d.set(() => d.registration = v),
@@ -384,6 +497,8 @@ class _StepCar extends StatelessWidget {
         const SizedBox(height: 14),
 
         _Field(
+          key: _keys[6],
+          focusNode: _nodes[6],
           label: t('fVin'),
           value: d.chassis,
           onChanged: (v) => d.set(() => d.chassis = v),
@@ -402,11 +517,19 @@ class _StepCar extends StatelessWidget {
 /// «أخرى» opens the old free-text box and the answer goes to the server exactly
 /// as it always did.
 class _TrimField extends StatefulWidget {
-  const _TrimField({required this.cfg, required this.d, required this.lang});
+  const _TrimField({
+    required this.cfg,
+    required this.d,
+    required this.lang,
+    this.onTouched,
+  });
 
   final AppConfig cfg;
   final Draft d;
   final String lang;
+
+  /// Answering this counts as having been through it — see `_StepCarState`.
+  final VoidCallback? onTouched;
 
   @override
   State<_TrimField> createState() => _TrimFieldState();
@@ -484,6 +607,7 @@ class _TrimFieldState extends State<_TrimField> {
           items: items,
           onChanged: (v) {
             if (v == null) return;
+            widget.onTouched?.call();
             setState(() {
               other = v == _otherKey;
               d.set(() => d.model = other ? '' : v);
@@ -507,8 +631,14 @@ class _TrimFieldState extends State<_TrimField> {
 
 // ====================================================== step 2 — condition
 
-class _StepCondition extends StatelessWidget {
-  const _StepCondition({required this.cfg, required this.d, required this.lang, required this.error});
+class _StepCondition extends StatefulWidget {
+  const _StepCondition({
+    super.key,
+    required this.cfg,
+    required this.d,
+    required this.lang,
+    required this.error,
+  });
 
   final AppConfig cfg;
   final Draft d;
@@ -516,7 +646,46 @@ class _StepCondition extends StatelessWidget {
   final String error;
 
   @override
+  State<_StepCondition> createState() => _StepConditionState();
+}
+
+class _StepConditionState extends State<_StepCondition> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// One press, one screenful.
+  ///
+  /// This step is taller than the phone and everything below the paint
+  /// questions — the notes box and the three condition scales — is optional.
+  /// Optional and below the fold means never answered: the customer pressed
+  /// «التالي» from the top of the page and went straight to the photographs.
+  ///
+  /// So the button pages down until the last question is on screen, and only
+  /// then means "next step". Scrolling there by hand counts too, because this
+  /// asks the scroll position rather than counting presses.
+  bool advance() {
+    if (!_scroll.hasClients) return false;
+    final p = _scroll.position;
+    if (p.pixels >= p.maxScrollExtent - 8) return false;
+    _scroll.animateTo(
+      (p.pixels + p.viewportDimension * 0.85).clamp(0.0, p.maxScrollExtent),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
+    return true;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final cfg = widget.cfg;
+    final d = widget.d;
+    final lang = widget.lang;
+    final error = widget.error;
     String t(String k) => cfg.t(k, lang);
     final cond = cfg.condition;
     final map = cfg.map;
@@ -524,6 +693,7 @@ class _StepCondition extends StatelessWidget {
     final hasAccident = d.panels.values.contains('accident');
 
     return ListView(
+      controller: _scroll,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
         ErrorBox(message: error),
@@ -1104,6 +1274,7 @@ class _Field extends StatefulWidget {
     this.keyboard,
     this.formatters,
     this.suffix,
+    this.focusNode,
   });
 
   final String label;
@@ -1113,6 +1284,7 @@ class _Field extends StatefulWidget {
   final TextInputType? keyboard;
   final List<TextInputFormatter>? formatters;
   final String? suffix;
+  final FocusNode? focusNode;
   final ValueChanged<String> onChanged;
 
   @override
@@ -1132,6 +1304,7 @@ class _FieldState extends State<_Field> {
   Widget build(BuildContext context) {
     return TextField(
       controller: c,
+      focusNode: widget.focusNode,
       onChanged: widget.onChanged,
       maxLines: widget.lines,
       keyboardType: widget.keyboard,
@@ -1151,12 +1324,14 @@ class _FieldState extends State<_Field> {
 
 class _Dropdown extends StatelessWidget {
   const _Dropdown({
+    super.key,
     required this.label,
     required this.hint,
     required this.value,
     required this.items,
     required this.onChanged,
     this.enabled = true,
+    this.focusNode,
   });
 
   final String label;
@@ -1164,12 +1339,14 @@ class _Dropdown extends StatelessWidget {
   final String? value;
   final List<String> items;
   final bool enabled;
+  final FocusNode? focusNode;
   final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       value: value,
+      focusNode: focusNode,
       isExpanded: true,
       decoration: InputDecoration(labelText: label),
       hint: Text(hint, style: Theme.of(context).textTheme.bodySmall),
