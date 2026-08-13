@@ -23,14 +23,18 @@ dependencies:
   shared_preferences: ^2.2.0  # cached config and the saved draft
   url_launcher: ^6.2.0     # terms, privacy, phone, Instagram
 
+  # Writes the real Android and iOS launch screens at build time, and gives
+  # main.dart the two calls that hold that screen up until the app has
+  # something to draw. That second part is why it is here and not in
+  # dev_dependencies.
+  flutter_native_splash: ^2.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  # Build-time only — they write the launcher icons and the launch screen,
-  # and neither is shipped as a dependency of the app itself.
+  # Build-time only — it writes the launcher icons and is never shipped.
   flutter_launcher_icons: ^0.14.0
-  flutter_native_splash: ^2.4.0
 
 # The screen between tapping the icon and the app being ready to draw.
 #
