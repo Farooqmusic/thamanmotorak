@@ -40,4 +40,10 @@ cp -r "$TMP/scaffold/ios" ./ios
 echo "==> applying our settings"
 python3 tool/patch_android.py "$PKG"
 
+# iOS gets the same treatment, and for the same reason: ios/ was thrown away
+# and rewritten three lines ago, so anything we decided about it has to be
+# applied here. Chiefly the camera and photo-library usage descriptions —
+# without them iOS terminates the app the instant a camera button is pressed.
+python3 tool/patch_ios.py
+
 echo "==> done. Package: $PKG"
