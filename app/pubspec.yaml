@@ -27,8 +27,41 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  # Build-time only — it writes the launcher icons and is never shipped.
+  # Build-time only — they write the launcher icons and the launch screen,
+  # and neither is shipped as a dependency of the app itself.
   flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.4.0
+
+# The screen between tapping the icon and the app being ready to draw.
+#
+# Flutter does not give you one: without this the phone shows a plain white
+# rectangle for a second or two, and on a dark-themed app that reads as a
+# flash of nothing gone wrong. Every serious app sets this — it is simply a
+# step that had never been added here, and `assets/brand/logo-splash.png` was
+# sitting in the repo unused.
+#
+# This runs at build time and writes the real Android and iOS launch screens,
+# so what appears is the TMK mark on the same near-black the app itself opens
+# on — the join between the launch screen and تصميم اليوم is invisible.
+flutter_native_splash:
+  color: "#131013"
+  image: assets/brand/logo-splash.png
+  android: true
+  ios: true
+  web: false
+
+  # Android 12 changed the rules: the system draws the launch screen itself and
+  # masks the artwork to a circle — 1152 px of drawable, only the middle 768 px
+  # certain to be visible. The wide wordmark loses both ends that way, so this
+  # one is the same artwork already centred in a square with the margin built
+  # in. The background matches the window, so the circle itself never shows.
+  #
+  # It lives under tool/ rather than assets/ on purpose: it is read once at
+  # build time and would otherwise be shipped inside the APK for nothing.
+  android_12:
+    color: "#131013"
+    image: tool/splash/logo-splash-android12.png
+    icon_background_color: "#131013"
 
 # The icon, generated for every Android density and every iOS size from one
 # picture, so there is no folder of hand-cut PNGs to keep in step.
