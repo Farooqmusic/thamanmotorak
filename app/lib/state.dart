@@ -35,6 +35,10 @@ class Draft extends ChangeNotifier {
   Map<String, String> photoPaths = {}; // slot key -> file path
   List<String> videoPaths = [];
 
+  /// The inspection report — «فحص» or any third party's. A PDF or a photo of
+  /// the paper; the server treats both the same and so does this.
+  List<String> reportPaths = [];
+
   // step 4 — the person
   String name = '';
   String phone = '';
@@ -48,6 +52,9 @@ class Draft extends ChangeNotifier {
 
   List<File> get videoFiles =>
       videoPaths.map(File.new).where((f) => f.existsSync()).toList();
+
+  List<File> get reportFiles =>
+      reportPaths.map(File.new).where((f) => f.existsSync()).toList();
 
   /// Exactly the field names `api.php?do=submit` reads. Keeping the mapping in
   /// one place means a rename on the server is a one-line change here, not a
@@ -110,6 +117,7 @@ class Draft extends ChangeNotifier {
         'paintStatus': paintStatus, 'paintExtent': paintExtent,
         'panels': panels, 'quality': quality,
         'photoPaths': photoPaths, 'videoPaths': videoPaths,
+        'reportPaths': reportPaths,
         'name': name, 'phone': phone, 'email': email, 'notes': notes,
         'retention': retention,
       }),
@@ -139,6 +147,13 @@ class Draft extends ChangeNotifier {
           .map((e) => '$e')
           .where((v) => File(v).existsSync())
           .toList();
+      // A draft saved before this field existed simply has no key, and a file
+      // the system has since cleaned out of the cache is dropped rather than
+      // resurrected as a path that will fail at upload time.
+      reportPaths = (m['reportPaths'] as List? ?? [])
+          .map((e) => '$e')
+          .where((v) => File(v).existsSync())
+          .toList();
       name = '${m['name'] ?? ''}';
       phone = '${m['phone'] ?? ''}';
       email = '${m['email'] ?? ''}';
@@ -158,6 +173,7 @@ class Draft extends ChangeNotifier {
     quality = {};
     photoPaths = {};
     videoPaths = [];
+    reportPaths = [];
     name = phone = email = notes = '';
     retention = 3;
     final p = await SharedPreferences.getInstance();
@@ -167,7 +183,10 @@ class Draft extends ChangeNotifier {
 
   /// True when there is enough here to be worth offering to continue.
   bool get hasContent =>
-      make.isNotEmpty || photoPaths.isNotEmpty || name.isNotEmpty;
+      make.isNotEmpty ||
+      photoPaths.isNotEmpty ||
+      reportPaths.isNotEmpty ||
+      name.isNotEmpty;
 
   static Map<String, String> _ss(Object? v) => v is Map
       ? v.map((k, val) => MapEntry('$k', '$val'))

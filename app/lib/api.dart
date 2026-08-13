@@ -68,6 +68,7 @@ class Api {
     required Map<String, String> fields,
     required Map<String, File> photos,
     List<File> videos = const [],
+    List<File> reports = const [],
     void Function(int sent, int total)? onProgress,
   }) async {
     final req = http.MultipartRequest('POST', _u('submit'));
@@ -78,6 +79,12 @@ class Api {
     }
     for (final v in videos) {
       req.files.add(await http.MultipartFile.fromPath('videos[]', v.path));
+    }
+    // `report[]` — the same field name the website's form posts, so both
+    // clients land in the same branch of api.php and there is only ever one
+    // piece of server code to be wrong.
+    for (final rp in reports) {
+      req.files.add(await http.MultipartFile.fromPath('report[]', rp.path));
     }
 
     final total = req.contentLength;

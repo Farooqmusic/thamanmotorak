@@ -54,6 +54,24 @@ class AppConfig {
   int get maxPhotoMB => _int(_limits['maxPhotoMB'], 12);
   int get maxVideoMB => _int(_limits['maxVideoMB'], 60);
 
+  /// The inspection report — «فحص» or any third party's.
+  int get maxReports => _int(_limits['maxReports'], 2);
+  int get maxReportMB => _int(_limits['maxReportMB'], 20);
+
+  /// Whether the server on the other end can actually receive one.
+  ///
+  /// This is not defensiveness for its own sake. The app is installed on
+  /// phones and updates through a store; the server changes the moment a file
+  /// is uploaded to Hostinger. If the two ever get out of step — a rollback, a
+  /// half-finished upload — a phone would happily let someone attach a 20 MB
+  /// PDF, upload all of it, get a cheerful "received", and have the file
+  /// silently dropped by a PHP that knows nothing about `report[]`. The
+  /// customer would never be told, and the draft would already be cleared.
+  ///
+  /// `maxReports` appears in `?do=config` only on a server that has the
+  /// feature, so its presence is the honest answer to "can I offer this?".
+  bool get supportsReports => _limits.containsKey('maxReports');
+
   List<int> get retentionDays {
     final v = _limits['retentionDays'];
     if (v is List && v.isNotEmpty) return v.map((e) => _int(e, 3)).toList();
