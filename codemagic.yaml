@@ -224,6 +224,162 @@ workflows:
       #   track: internal
       #   submit_as_draft: false
 
+
+  # ----------------------------------------------------------------
+  #  iOS — AD HOC. Straight onto Farooq's own iPhones.
+  #
+  #  Nothing here goes to App Store Connect and nothing is reviewed
+  #  by Apple. The build is signed with his own certificate for the
+  #  iPhones whose UDIDs are registered in his developer account,
+  #  and installs over the air from his own website.
+  #
+  #  Started by hand — there is deliberately no `triggering` block,
+  #  so a push to main does not spend a mac minute on an iOS build
+  #  nobody asked for.
+  # ----------------------------------------------------------------
+  ios-adhoc:
+    name: iOS — ad hoc (install on your own iPhones)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      flutter: *flutter_version
+      xcode: latest
+      cocoapods: default
+
+      # The App Store Connect API key, added once in Codemagic under
+      # Teams / Personal account -> Integrations -> App Store Connect.
+      # The name below must match what it is called there, exactly.
+      #
+      # With it, Codemagic creates the certificate and the ad-hoc
+      # provisioning profile itself. The profile covers every device
+      # registered in the Apple developer account at the moment of the
+      # build — so a NEW iPhone means: register its UDID first, then
+      # build again. An already-built ipa cannot learn about a phone.
+      integrations:
+        app_store_connect: thamanmotorak
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.thamanmotorak.app
+
+      vars:
+        # Where the three files below will live once they are uploaded.
+        # iOS refuses to install over the air from anything but HTTPS,
+        # which his own site already is.
+        BETA_URL: https://www.thamanmotorak.com/beta
+
+    scripts:
+      - *generate_platform_folders
+      - *pub_get
+      - *icons
+      - *splash
+      - *analyze
+      - *test
+
+      - name: Register the signing profile with Xcode
+        script: cd app && xcode-project use-profiles
+
+      - name: Build the ad hoc ipa
+        script: |
+          cd app
+          flutter build ipa --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=APP_VERSION=1.0.$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+
+      # An .ipa on its own cannot be installed by tapping it. iOS wants a
+      # manifest describing it, fetched over HTTPS through an itms-services
+      # link. Both are written here, already pointing at the right URLs, so
+      # that installing is: upload four files, open one page on the phone.
+      - name: Make the over-the-air install page
+        script: |
+          cd app
+          mkdir -p out/beta
+          cp build/ios/ipa/*.ipa out/beta/thamanmotorak.ipa
+          cp assets/brand/icon-512.png out/beta/icon-512.png
+
+          cat > out/beta/manifest.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>items</key>
+            <array>
+              <dict>
+                <key>assets</key>
+                <array>
+                  <dict>
+                    <key>kind</key><string>software-package</string>
+                    <key>url</key><string>$BETA_URL/thamanmotorak.ipa</string>
+                  </dict>
+                  <dict>
+                    <key>kind</key><string>display-image</string>
+                    <key>url</key><string>$BETA_URL/icon-512.png</string>
+                  </dict>
+                  <dict>
+                    <key>kind</key><string>full-size-image</string>
+                    <key>url</key><string>$BETA_URL/icon-512.png</string>
+                  </dict>
+                </array>
+                <key>metadata</key>
+                <dict>
+                  <key>bundle-identifier</key><string>com.thamanmotorak.app</string>
+                  <key>bundle-version</key><string>1.0.$BUILD_NUMBER</string>
+                  <key>kind</key><string>software</string>
+                  <key>title</key><string>Thamanmotorak</string>
+                </dict>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          EOF
+
+          cat > out/beta/index.html <<EOF
+          <!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>ثـمـــن مــوتــرك — نسخة تجريبية</title>
+          <style>
+            body{margin:0;min-height:100vh;display:grid;place-items:center;background:#131013;
+                 color:#f2ecef;font-family:-apple-system,system-ui,sans-serif;text-align:center;padding:24px}
+            .b{display:block;background:#c02a55;color:#fff;text-decoration:none;font-weight:700;
+               font-size:19px;padding:17px 34px;border-radius:14px;margin:26px auto 0}
+            p{color:#b6a5ac;font-size:14px;line-height:1.9;max-width:30em;margin:8px auto}
+            code{color:#ff7fa3}
+          </style>
+          <h1>ثـمـــن مــوتــرك</h1>
+          <p>النسخة التجريبية <code>1.0.$BUILD_NUMBER</code></p>
+          <a class="b" href="itms-services://?action=download-manifest&amp;url=$BETA_URL/manifest.plist">تثبيت على الآيفون</a>
+          <p>افتح هذه الصفحة من <b>Safari على الآيفون</b> — لن تعمل من الكمبيوتر ولا من متصفح آخر.<br>
+          بعد التثبيت: الإعدادات ← عام ← إدارة VPN والأجهزة ← ثِق بالمطوّر.</p>
+          <p style="direction:ltr">Open this page in <b>Safari on the iPhone</b> — it will not work on a computer or in another browser.<br>
+          After installing: Settings → General → VPN &amp; Device Management → trust the developer.</p>
+          </html>
+          EOF
+
+          # Hostinger serves most things correctly, but an ipa handed over as
+          # text/plain simply will not install, and the failure gives no reason.
+          cat > out/beta/.htaccess <<'EOF'
+          AddType application/octet-stream .ipa
+          AddType application/xml .plist
+          EOF
+
+          ls -lh out/beta
+
+    artifacts:
+      - app/out/beta/*
+      - app/out/beta/.htaccess
+      - app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - 8my77kyffn@privaterelay.appleid.com
+        notify:
+          success: true
+          failure: true
+
   # ----------------------------------------------------------------
   #  iOS — after Android is on a phone and working
   # ----------------------------------------------------------------
