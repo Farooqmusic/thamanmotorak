@@ -242,24 +242,28 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
 
+    # The App Store Connect API key that was already in Codemagic for Farooq
+    # Music. A key belongs to the Apple **account**, not to an app, and both
+    # apps are on the same team — so there was no second key to make. The name
+    # is what Codemagic calls it under Integrations, matched literally:
+    # "Farooq Music", capitals and space included.
+    #
+    # `integrations` is a SIBLING of `environment`, not a child of it. Nesting
+    # it inside was rejected outright — "extra fields not permitted" — which is
+    # at least a validation error you get before the build rather than after.
+    #
+    # With it, Codemagic creates the certificate and the ad-hoc provisioning
+    # profile itself. The profile covers every device registered in the Apple
+    # developer account at the moment of the build — so a NEW iPhone means:
+    # register its UDID first, then build again. An already-built ipa cannot
+    # learn about a phone.
+    integrations:
+      app_store_connect: "Farooq Music"
+
     environment:
       flutter: *flutter_version
       xcode: latest
       cocoapods: default
-
-      # The App Store Connect API key that was already in Codemagic for
-      # Farooq Music. A key belongs to the Apple **account**, not to an app,
-      # and both apps are on the same team — so there was no second key to
-      # make. The name is what Codemagic calls it under Integrations, and it
-      # is matched literally: "Farooq Music", capitals and space included.
-      #
-      # With it, Codemagic creates the certificate and the ad-hoc
-      # provisioning profile itself. The profile covers every device
-      # registered in the Apple developer account at the moment of the
-      # build — so a NEW iPhone means: register its UDID first, then
-      # build again. An already-built ipa cannot learn about a phone.
-      integrations:
-        app_store_connect: "Farooq Music"
       ios_signing:
         distribution_type: ad_hoc
         bundle_identifier: com.thamanmotorak.app
@@ -390,16 +394,17 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
 
+    # The same key the ad-hoc workflow uses — the one already set up for Farooq
+    # Music. Codemagic creates the distribution certificate and the App Store
+    # profile from it. Sibling of `environment`, not a child; see the note in
+    # the ad-hoc workflow above.
+    integrations:
+      app_store_connect: "Farooq Music"
+
     environment:
       flutter: *flutter_version
       xcode: latest
       cocoapods: default
-      # The same key the ad-hoc workflow uses — the one already set up for
-      # Farooq Music. Codemagic creates the distribution certificate and the
-      # App Store profile from it, which is the only sane way to do Apple
-      # signing on a build machine.
-      integrations:
-        app_store_connect: "Farooq Music"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.thamanmotorak.app
