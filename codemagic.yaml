@@ -16,7 +16,7 @@
 
 definitions:
   # The version everything is built with. Change it in one place.
-  flutter_version: &flutter_version 3.32.0
+  flutter_version: &flutter_version 3.35.7
 
   scripts:
     - &generate_platform_folders
