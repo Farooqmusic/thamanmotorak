@@ -24,6 +24,18 @@ ANDROID = APP / "android"
 LABEL_EN = "Thamanmotorak"
 LABEL_AR = "Thamanmotorak"
 
+# The API level the app compiles against and declares it was tested on.
+#
+# Google Play refuses an update whose targetSdk is more than one major release
+# behind Android: from 31 August 2026 that means API 36 (Android 16). Flutter's
+# generated build.gradle.kts writes `flutter.targetSdkVersion`, whose value
+# moves with whichever Flutter version CI happens to install — so the single
+# number that decides whether Play accepts the upload was not written down
+# anywhere in this repository. It is now, and step 5 fails the build if
+# Flutter's template ever changes shape underneath it.
+COMPILE_SDK = 36
+TARGET_SDK = 36
+
 
 def die(msg: str) -> None:
     print(f"patch_android: {msg}", file=sys.stderr)
@@ -193,6 +205,27 @@ def main() -> None:
             write(gradle, s)
     else:
         die("android/app/build.gradle.kts not found — Flutter's template changed")
+
+    # ------------------------------------------------ 5. target API level
+    #
+    # Pinned rather than inherited — see COMPILE_SDK / TARGET_SDK above. Play
+    # rejects the upload outright if this is wrong, and the rejection arrives
+    # only after the whole build has already run.
+    if gradle.exists():
+        s = read(gradle)
+        s = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion",
+                   f"compileSdk = {COMPILE_SDK}", s)
+        s = re.sub(r"targetSdk\s*=\s*flutter\.targetSdkVersion",
+                   f"targetSdk = {TARGET_SDK}", s)
+        write(gradle, s)
+
+        # Proof, not assumption: read it back off disk.
+        s = read(gradle)
+        for want in (f"compileSdk = {COMPILE_SDK}", f"targetSdk = {TARGET_SDK}"):
+            if want not in s:
+                die(f"could not pin '{want}' in android/app/build.gradle.kts — "
+                    "Flutter's template changed, look at it before building")
+        print(f"  compileSdk / targetSdk pinned to {COMPILE_SDK} / {TARGET_SDK}")
 
     print(f"patch_android: ok — {pkg}")
 
