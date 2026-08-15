@@ -40,12 +40,14 @@ Run by tool/bootstrap.sh, straight after patch_android.py. Idempotent.
 from __future__ import annotations
 
 import plistlib
+import re
 import sys
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 PLIST = APP / "ios/Runner/Info.plist"
 PBXPROJ = APP / "ios/Runner.xcodeproj/project.pbxproj"
+PODFILE = APP / "ios/Podfile"
 
 # What `flutter create --org com.thamanmotorak --project-name thaman_app` writes
 # into the Xcode project. Android's generated name is different again
@@ -56,6 +58,14 @@ GENERATED = "com.thamanmotorak.thamanApp"
 # launcher that says one thing on one phone and something else on another makes
 # the same app look like two.
 DISPLAY_NAME = "Thamanmotorak"
+
+# The oldest iPhone this app will install on.
+#
+# App Store Connect warns on every upload that 12.0 is too low: 13.0 is
+# required later this year and 15.0 in spring 2027. Flutter's template writes
+# whatever its own floor happens to be, which is how 12.0 reached build 7
+# without anyone choosing it. Chosen here instead, and asserted after writing.
+DEPLOYMENT_TARGET = "13.0"
 
 # Both languages in one sentence, because the phone shows exactly this text and
 # we do not know which language its owner reads. The Arabic comes first: this is
@@ -111,10 +121,52 @@ def fix_bundle_id(pkg: str) -> None:
         print(f"    {ln}")
 
 
+def set_deployment_target() -> None:
+    """Raise the iOS floor in both places that decide it.
+
+    The Xcode project is what MinimumOSVersion in the shipped Info.plist is
+    derived from, so it is the one Apple reads. The Podfile matters too:
+    CocoaPods builds every dependency against the platform declared there, and
+    a Podfile left at Flutter's commented-out default quietly builds pods for
+    an older iOS than the app itself.
+    """
+    if not PBXPROJ.exists():
+        die("ios/Runner.xcodeproj/project.pbxproj is missing")
+
+    s = PBXPROJ.read_text(encoding="utf-8")
+    s, n = re.subn(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;",
+                   f"IPHONEOS_DEPLOYMENT_TARGET = {DEPLOYMENT_TARGET};", s)
+    if n == 0:
+        die("no IPHONEOS_DEPLOYMENT_TARGET in project.pbxproj — "
+            "Flutter's template changed, look at it before building")
+    PBXPROJ.write_text(s, encoding="utf-8")
+
+    # Proof: read it back and make sure nothing lower survived anywhere.
+    left = {ln.strip() for ln in PBXPROJ.read_text(encoding="utf-8").splitlines()
+            if "IPHONEOS_DEPLOYMENT_TARGET" in ln}
+    wrong = [ln for ln in left if f"= {DEPLOYMENT_TARGET};" not in ln]
+    if wrong:
+        die("these deployment targets did not take: " + "; ".join(sorted(wrong)))
+    print(f"  deployment target -> {DEPLOYMENT_TARGET} ({n} build configurations)")
+
+    if PODFILE.exists():
+        t = PODFILE.read_text(encoding="utf-8")
+        t, n = re.subn(r"^\s*#?\s*platform :ios, ['\"][0-9.]+['\"]",
+                       f"platform :ios, '{DEPLOYMENT_TARGET}'", t, count=1,
+                       flags=re.MULTILINE)
+        if n == 0:
+            t = f"platform :ios, '{DEPLOYMENT_TARGET}'\n" + t
+        PODFILE.write_text(t, encoding="utf-8")
+        if f"platform :ios, '{DEPLOYMENT_TARGET}'" not in PODFILE.read_text(encoding="utf-8"):
+            die("Podfile platform line did not take")
+        print(f"  Podfile platform -> ios {DEPLOYMENT_TARGET}")
+
+
 def main() -> None:
     pkg = sys.argv[1] if len(sys.argv) > 1 else "com.thamanmotorak.app"
 
     fix_bundle_id(pkg)
+    set_deployment_target()
 
     if not PLIST.exists():
         die("ios/Runner/Info.plist does not exist — run tool/bootstrap.sh first")
@@ -148,6 +200,7 @@ def main() -> None:
         die("these did not survive the write: " + ", ".join(missing))
 
     print(f"patch_ios: ok — {pkg}, {DISPLAY_NAME}, "
+          f"iOS {DEPLOYMENT_TARGET}+, "
           f"{len(PERMISSIONS)} usage descriptions, export compliance answered")
     for key in sorted(PERMISSIONS):
         print(f"  {key}")
