@@ -67,6 +67,16 @@ DISPLAY_NAME = "Thamanmotorak"
 # without anyone choosing it. Chosen here instead, and asserted after writing.
 DEPLOYMENT_TARGET = "13.0"
 
+# iPhone only.
+#
+# Flutter's template ships TARGETED_DEVICE_FAMILY = "1,2", which tells Apple the
+# app supports iPad — and App Store Connect then *requires* a set of 13-inch
+# iPad screenshots before it will accept a submission. Nothing in this app was
+# designed for an iPad: it is a camera-and-form workflow built for a phone.
+# Declaring iPhone only removes that requirement; iPads can still install it in
+# compatibility mode.
+DEVICE_FAMILY = "1"
+
 # Both languages in one sentence, because the phone shows exactly this text and
 # we do not know which language its owner reads. The Arabic comes first: this is
 # a Qatari product and most of its customers are Arabic speakers.
@@ -139,7 +149,13 @@ def set_deployment_target() -> None:
     if n == 0:
         die("no IPHONEOS_DEPLOYMENT_TARGET in project.pbxproj — "
             "Flutter's template changed, look at it before building")
+    s, n2 = re.subn(r'TARGETED_DEVICE_FAMILY = "[0-9,]+";',
+                    f'TARGETED_DEVICE_FAMILY = "{DEVICE_FAMILY}";', s)
+    if n2 == 0:
+        die("no TARGETED_DEVICE_FAMILY in project.pbxproj — "
+            "Flutter's template changed, look at it before building")
     PBXPROJ.write_text(s, encoding="utf-8")
+    print(f"  device family -> {DEVICE_FAMILY} (iPhone only, {n2} build configurations)")
 
     # Proof: read it back and make sure nothing lower survived anywhere.
     left = {ln.strip() for ln in PBXPROJ.read_text(encoding="utf-8").splitlines()
